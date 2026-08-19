@@ -282,8 +282,6 @@ function registerGestureComponents() {
 
 export default function ARViewer() {
   const sceneRef = useRef<AFrameElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const cameraStreamRef = useRef<MediaStream | null>(null);
   const [scriptsReady, setScriptsReady] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -295,7 +293,7 @@ export default function ARViewer() {
       try {
         if (!window.isSecureContext) {
           throw new Error(
-            'Kamera hanya bisa dibuka dari localhost atau HTTPS. Jika dibuka dari IP jaringan, gunakan HTTPS/tunnel.',
+            'Kamera hanya bisa dibuka dari localhost atau HTTPS.',
           );
         }
 
@@ -329,88 +327,28 @@ export default function ARViewer() {
       return;
     }
 
-    let cancelled = false;
-
-    async function startCameraPreview() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            frameRate: { ideal: 30 },
-          },
-          audio: false,
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        const [videoTrack] = stream.getVideoTracks();
-        const capabilities = videoTrack.getCapabilities?.() as MediaTrackCapabilities & {
-          focusMode?: string[];
-        };
-
-        if (capabilities.focusMode?.includes('continuous')) {
-          await videoTrack.applyConstraints({
-            advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
-          });
-        }
-
-        cameraStreamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        setCameraReady(true);
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        setLoadError(
-          error instanceof Error
-            ? `Kamera gagal dimulai: ${error.message}`
-            : 'Kamera gagal dimulai. Izinkan akses kamera, lalu coba refresh.',
-        );
-      }
-    }
-
-    startCameraPreview();
-
-    return () => {
-      cancelled = true;
-      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
-      cameraStreamRef.current = null;
-    };
-  }, [scriptsReady]);
-
-  useEffect(() => {
-    if (!scriptsReady) {
-      return;
-    }
-
     const scene = sceneRef.current;
-
     if (!scene) {
       return;
     }
+
+    const markCameraReady = () => {
+      setCameraReady(true);
+    };
 
     const handleArError = (event: Event) => {
       const error = event as CustomEvent<{ error?: Error }>;
       setLoadError(
         error.detail?.error?.message ||
-          'Tracking AR gagal dimulai. Pastikan file marker tersedia, lalu coba refresh.',
+          'Tracking AR gagal dimulai.',
       );
     };
 
+    scene.addEventListener('arReady', markCameraReady, { once: true });
     scene.addEventListener('arError', handleArError);
 
     return () => {
+      scene.removeEventListener('arReady', markCameraReady);
       scene.removeEventListener('arError', handleArError);
     };
   }, [scriptsReady]);
@@ -422,9 +360,6 @@ export default function ARViewer() {
           <div>
             <p className="text-lg font-semibold">
               {scriptsReady ? 'Menyalakan kamera...' : 'Menyiapkan WebAR...'}
-            </p>
-            <p className="mt-2 text-sm text-white/70">
-              Arahkan kamera ke marker setelah akses kamera aktif.
             </p>
           </div>
         </div>
@@ -439,20 +374,11 @@ export default function ARViewer() {
         </div>
       ) : null}
 
-      <video
-        ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover"
-        style={{ filter: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none' }}
-        autoPlay
-        muted
-        playsInline
-      />
-
       {scriptsReady ? (
         <>
           <a-scene
             ref={sceneRef}
-            mindar-image={`imageTargetSrc: ${IMAGE_TARGET_URL}; autoStart: true; uiScanning: yes; uiLoading: yes; filterMinCF: 0.0001; filterBeta: 0.001;`}
+            mindar-image={`imageTargetSrc: ${IMAGE_TARGET_URL}; autoStart: true; uiScanning: yes; uiLoading: yes; uiError: yes;`}
             color-space="sRGB"
             renderer="colorManagement: true; alpha: true; antialias: true"
             vr-mode-ui="enabled: false"
