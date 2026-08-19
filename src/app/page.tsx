@@ -1,6 +1,17 @@
-import { Settings } from "lucide-react";
-import ProjectInfo from "../components/ProjectInfo";
-import SpatialViewer from "../components/SpatialViewer";
+'use client';
+
+import dynamic from 'next/dynamic';
+import { Settings } from 'lucide-react';
+import ProjectInfo from '../components/ProjectInfo';
+
+const ARViewer = dynamic(() => import('@/components/ARViewer'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[320px] w-full items-center justify-center rounded-[22px] bg-black px-6 text-center text-white sm:h-[420px] lg:h-[520px]">
+      <p className="text-lg font-semibold">Meminta izin kamera...</p>
+    </div>
+  ),
+});
 
 export default function Home() {
   return (
@@ -21,7 +32,29 @@ export default function Home() {
         </header>
 
         <div className="space-y-5 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
-          <SpatialViewer />
+          <section className="relative overflow-hidden rounded-[28px] border border-[rgba(90,220,220,0.22)] bg-[linear-gradient(145deg,#0A242B_0%,#081F26_100%)] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03),0_0_30px_rgba(60,220,220,0.06)] sm:p-4">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(93,235,235,0.08),transparent_50%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(rgba(93,235,235,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(93,235,235,0.04)_1px,transparent_1px)] bg-[size:32px_32px] opacity-25" />
+
+            <div className="relative z-10 flex h-full w-full flex-col gap-3">
+              <div className="pl-2 pt-2 text-left sm:pl-3 sm:pt-3">
+                <p className="text-[10px] font-medium uppercase tracking-[0.26em] text-[#A9C4C7]">
+                  Spatial Object Viewer
+                </p>
+                <h3 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-[#F4FFFF] sm:text-2xl">
+                  Masjid Raya Baiturrahman
+                </h3>
+                <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#69E8E8]">
+                  Marker-based WebAR
+                </p>
+              </div>
+
+              <div className="relative h-[320px] w-full overflow-hidden rounded-[22px] border border-[rgba(90,220,220,0.18)] bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.04)] sm:h-[420px] lg:h-[520px]">
+                <ARViewer />
+              </div>
+            </div>
+          </section>
+
           <ProjectInfo />
         </div>
       </div>

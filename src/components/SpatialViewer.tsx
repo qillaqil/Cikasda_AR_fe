@@ -94,7 +94,7 @@ export default function SpatialViewer() {
             type="button"
             onClick={handleFullscreen}
             aria-label="Expand Spatial Viewer"
-            className="absolute bottom-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(93,235,235,0.28)] bg-[rgba(11,48,53,0.8)] text-[#F4FFFF] backdrop-blur-md shadow-[0_0_15px_rgba(93,235,235,0.12)] transition-all duration-200 hover:scale-105 hover:border-[rgba(93,235,235,0.38)] hover:bg-[rgba(10,55,60,0.9)]"
+            className="absolute bottom-4 right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(93,235,235,0.28)] bg-[rgba(11,48,53,0.8)] text-[#F4FFFF] shadow-[0_0_15px_rgba(93,235,235,0.12)] transition-all duration-200 hover:scale-105 hover:border-[rgba(93,235,235,0.38)] hover:bg-[rgba(10,55,60,0.9)]"
           >
             {isFullscreen ? <Minimize2 size={20} strokeWidth={1.8} /> : <Maximize2 size={20} strokeWidth={1.8} />}
           </button>
