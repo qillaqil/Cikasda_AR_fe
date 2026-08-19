@@ -282,6 +282,8 @@ function registerGestureComponents() {
 
 export default function ARViewer() {
   const sceneRef = useRef<AFrameElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const [scriptsReady, setScriptsReady] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -321,6 +323,50 @@ export default function ARViewer() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!scriptsReady) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function startCameraPreview() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 },
+          },
+          audio: false,
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        cameraStreamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+      } catch {
+        // MindAR still owns the AR camera; this preview is only the visible background.
+      }
+    }
+
+    startCameraPreview();
+
+    return () => {
+      cancelled = true;
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    };
+  }, [scriptsReady]);
 
   useEffect(() => {
     if (!scriptsReady) {
@@ -373,6 +419,15 @@ export default function ARViewer() {
           </div>
         </div>
       ) : null}
+
+      <video
+        ref={videoRef}
+        className="absolute inset-0 h-full w-full object-cover"
+        style={{ filter: 'none', backdropFilter: 'none', WebkitBackdropFilter: 'none' }}
+        autoPlay
+        muted
+        playsInline
+      />
 
       {scriptsReady ? (
         <>
