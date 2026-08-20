@@ -36,26 +36,6 @@ input {
 }
 
 /* Keep the live camera preview visible behind the transparent AR canvas. */
-/* Reset MindAR UI to be contained within our relative section */
-.mindar-ui-scanning,
-.mindar-ui-loading,
-.mindar-ui-error {
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 50 !important;
-  background: rgba(0, 0, 0, 0.4) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-/* Ensure the scanner image is visible and not blurred */
-.mindar-ui-scanning .scanning,
-.mindar-ui-loading .loading {
-  filter: none !important;
-  backdrop-filter: none !important;
-}
-
 /* Hide A-Frame VR Button definitively */
 .a-enter-vr {
   display: none !important;
@@ -77,6 +57,13 @@ a-scene video {
 a-scene,
 a-scene canvas {
   background: transparent !important;
+}
+
+/* HIDE MindAR UI elements */
+.mindar-ui-scanning,
+.mindar-ui-loading,
+.mindar-ui-error {
+  display: none !important;
 }
 
 ::-webkit-scrollbar {
