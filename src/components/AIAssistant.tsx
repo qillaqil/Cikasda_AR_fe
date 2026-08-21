@@ -14,16 +14,16 @@ interface ChatMessageData {
 const quickQuestions = [
   "Apa fungsi bangunan ini?",
   "Kapan proyek ini dibuat?",
-  "Di mana lokasi Masjid Raya Baiturrahman?",
+  "Di mana lokasi Masjid Raya Baitul Khairaat?",
 ];
 
 const mockResponses: Record<string, string> = {
   "apa fungsi bangunan ini?":
-    "Masjid Raya Baiturrahman merupakan bangunan yang memiliki fungsi utama sebagai tempat ibadah sekaligus pusat kegiatan sosial dan keagamaan masyarakat.",
+    "Masjid Raya Baitul Khairaat merupakan bangunan yang memiliki fungsi utama sebagai tempat ibadah sekaligus pusat kegiatan sosial dan keagamaan masyarakat.",
   "kapan proyek ini dibuat?":
-    "Data proyek menunjukkan tahun 2026 sebagai tahun yang tercatat pada informasi objek.",
+    "Data proyek menunjukkan tahun 2025 sebagai tahun yang tercatat pada informasi objek.",
   "di mana lokasi masjid ini?":
-    "Masjid Raya Baiturrahman berada di kawasan Sulawesi Tengah.",
+    "Masjid Raya Baitul Khairaat berada di kawasan Sulawesi Tengah.",
 };
 
 function getMockResponse(question: string) {
@@ -36,7 +36,7 @@ export default function AIAssistant() {
     {
       id: "welcome",
       role: "assistant",
-      content: "Halo! Ada yang ingin Anda ketahui tentang Masjid Raya Baiturrahman?",
+      content: "Halo! Ada yang ingin Anda ketahui tentang Masjid Raya Baitul Khairaat?",
     },
   ]);
   const [input, setInput] = useState("");

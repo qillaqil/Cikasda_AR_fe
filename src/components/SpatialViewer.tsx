@@ -44,7 +44,7 @@ export default function SpatialViewer() {
             Spatial Object Viewer
           </p>
           <h3 className="mt-3 text-xl font-semibold tracking-[-0.04em] text-[#F4FFFF] sm:text-2xl">
-            Masjid Raya Baiturrahman
+            Masjid Raya Baitul Khairaat
           </h3>
           <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#69E8E8]">
             Live Model

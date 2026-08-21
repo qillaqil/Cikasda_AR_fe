@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface InfoCardProps {
@@ -5,25 +6,34 @@ interface InfoCardProps {
   label: string;
   value: string;
   accent: string;
+  onOpen: () => void;
 }
 
-export default function InfoCard({ icon: Icon, label, value, accent }: InfoCardProps) {
+export default function InfoCard({ icon: Icon, label, value, accent, onOpen }: InfoCardProps) {
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-[rgba(90,220,220,0.16)] bg-[rgba(20,55,60,0.55)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm transition hover:border-[rgba(93,235,235,0.2)] hover:shadow-[0_0_0_1px_rgba(93,235,235,0.08)] sm:p-5">
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex min-w-0 items-center gap-3 rounded-2xl border border-[#EDF2F2] bg-white p-3 text-left shadow-[0_6px_16px_rgba(32,83,94,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(32,83,94,0.12)] focus:outline-none focus:ring-2 focus:ring-[#58C6C3] sm:p-3.5"
+    >
       <div
-        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[rgba(90,220,220,0.14)] ${accent}`}
+        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${accent}`}
       >
-        <Icon className="h-5 w-5" />
+        <Icon className="h-7 w-7" strokeWidth={1.8} />
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#A9C4C7]">
+        <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-[#168E82]">
           {label}
         </p>
-        <p className="mt-1 text-sm font-semibold leading-5 text-[#F4FFFF] sm:text-base">
+        <p className="mt-1 break-words text-[15px] font-semibold leading-5 text-[#173F53] sm:text-base">
           {value}
         </p>
       </div>
-    </div>
+
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EAF7F5] text-[#159E9D]">
+        <ChevronRight className="h-5 w-5" strokeWidth={2} />
+      </div>
+    </button>
   );
 }
