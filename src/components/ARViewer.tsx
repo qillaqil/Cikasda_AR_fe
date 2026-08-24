@@ -66,11 +66,11 @@ type GestureCustomEvent = CustomEvent<GestureEventDetail>;
 
 const AFRAME_SCRIPT_ID = "aframe-runtime-script";
 const MINDAR_SCRIPT_ID = "mindar-image-aframe-script";
-const AFRAME_SCRIPT_URL = "https://aframe.io/releases/1.4.2/aframe.min.js";
+const AFRAME_SCRIPT_URL = "https://aframe.io/releases/1.5.0/aframe.min.js";
 const MINDAR_SCRIPT_URL =
   "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js";
 const IMAGE_TARGET_URL = "/markers/targets.mind";
-const MODEL_URL = "/models/mosque.glb";
+const MODEL_URL = process.env.NEXT_PUBLIC_MODEL_URL!;
 
 function loadScript(id: string, src: string) {
   return new Promise<void>((resolve, reject) => {

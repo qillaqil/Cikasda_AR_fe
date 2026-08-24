@@ -11,25 +11,13 @@ interface ChatMessageData {
   content: string;
 }
 
+const CHAT_API_URL = "/api/chat"; // Menggunakan Next.js API Route lokal
+
 const quickQuestions = [
   "Apa fungsi bangunan ini?",
   "Kapan proyek ini dibuat?",
   "Di mana lokasi Masjid Raya Baitul Khairaat?",
 ];
-
-const mockResponses: Record<string, string> = {
-  "apa fungsi bangunan ini?":
-    "Masjid Raya Baitul Khairaat merupakan bangunan yang memiliki fungsi utama sebagai tempat ibadah sekaligus pusat kegiatan sosial dan keagamaan masyarakat.",
-  "kapan proyek ini dibuat?":
-    "Data proyek menunjukkan tahun 2025 sebagai tahun yang tercatat pada informasi objek.",
-  "di mana lokasi masjid ini?":
-    "Masjid Raya Baitul Khairaat berada di kawasan Sulawesi Tengah.",
-};
-
-function getMockResponse(question: string) {
-  const normalized = question.trim().toLowerCase();
-  return mockResponses[normalized] ?? "Maaf, informasi tersebut belum tersedia dalam data Spatial Viewer.";
-}
 
 export default function AIAssistant() {
   const [messages, setMessages] = useState<ChatMessageData[]>([
@@ -51,7 +39,7 @@ export default function AIAssistant() {
     }
   }, [visibleMessages, isLoading]);
 
-  const handleSend = (question?: string) => {
+  const handleSend = async (question?: string) => {
     const text = (question ?? input).trim();
     if (!text) return;
 
@@ -65,17 +53,43 @@ export default function AIAssistant() {
     setInput("");
     setIsLoading(true);
 
-    window.setTimeout(() => {
+    try {
+      const response = await fetch(CHAT_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: text }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const assistantResponse = data.response || "Maaf, terjadi kesalahan saat memproses permintaan Anda.";
+
       setMessages((current) => [
         ...current,
         {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          content: getMockResponse(text),
+          content: assistantResponse,
         },
       ]);
+    } catch (error) {
+      console.error("Error sending message to backend:", error);
+      setMessages((current) => [
+        ...current,
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: "Maaf, terjadi kesalahan saat menghubungi asisten AI.",
+        },
+      ]);
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
