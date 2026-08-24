@@ -71,7 +71,7 @@ export default function Home() {
 
           <div className="relative flex min-w-0 items-center gap-2">
             <Image
-              src="/public/CIKASDA.svg"
+              src="/cikasda.webp"
               alt="CIKASDA"
               width={410}
               height={155}
