@@ -1,12 +1,20 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import Image from 'next/image';
-import { Camera, Info, Languages, RotateCcw, Settings, Volume2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import ProjectInfo from '../components/ProjectInfo';
+import dynamic from "next/dynamic";
+import Image from "next/image";
+import {
+  Camera,
+  Info,
+  Languages,
+  RotateCcw,
+  Settings,
+  Volume2,
+  X,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import ProjectInfo from "../components/ProjectInfo";
 
-const ARViewer = dynamic(() => import('@/components/ARViewer'), {
+const ARViewer = dynamic(() => import("@/components/ARViewer"), {
   ssr: false,
   loading: () => (
     <div className="flex h-full min-h-[320px] w-full items-center justify-center bg-black px-6 text-center text-white">
@@ -17,40 +25,40 @@ const ARViewer = dynamic(() => import('@/components/ARViewer'), {
 
 export default function Home() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [cameraStatus, setCameraStatus] = useState('Belum diperiksa');
-  const [quality, setQuality] = useState('Tinggi');
+  const [cameraStatus, setCameraStatus] = useState("Belum diperiksa");
+  const [quality, setQuality] = useState("Tinggi");
   const [isSoundOn, setIsSoundOn] = useState(true);
-  const [language, setLanguage] = useState('Indonesia');
-  const [resetStatus, setResetStatus] = useState('');
+  const [language, setLanguage] = useState("Indonesia");
+  const [resetStatus, setResetStatus] = useState("");
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsSettingsOpen(false);
+      if (event.key === "Escape") setIsSettingsOpen(false);
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, []);
 
   const checkCameraPermission = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraStatus('Tidak didukung browser');
+      setCameraStatus("Tidak didukung browser");
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach((track) => track.stop());
-      setCameraStatus('Izin kamera aktif');
+      setCameraStatus("Izin kamera aktif");
     } catch {
-      setCameraStatus('Izin kamera ditolak');
+      setCameraStatus("Izin kamera ditolak");
     }
   };
 
   const resetView = () => {
-    window.dispatchEvent(new Event('ar-reset-view'));
-    setResetStatus('Tampilan berhasil direset');
-    window.setTimeout(() => setResetStatus(''), 2500);
+    window.dispatchEvent(new Event("ar-reset-view"));
+    setResetStatus("Tampilan berhasil direset");
+    window.setTimeout(() => setResetStatus(""), 2500);
   };
 
   return (
@@ -63,7 +71,7 @@ export default function Home() {
 
           <div className="relative flex min-w-0 items-center gap-2">
             <Image
-              src="/cikasda.svg"
+              src="/public/CIKASDA.svg"
               alt="CIKASDA"
               width={410}
               height={155}
@@ -145,8 +153,15 @@ export default function Home() {
             <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[#B7D9D8]" />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#159E9D]">Pengaturan</p>
-                <h2 id="settings-title" className="mt-1 text-2xl font-bold text-[#173F53]">Spatial Viewer</h2>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#159E9D]">
+                  Pengaturan
+                </p>
+                <h2
+                  id="settings-title"
+                  className="mt-1 text-2xl font-bold text-[#173F53]"
+                >
+                  Spatial Viewer
+                </h2>
               </div>
               <button
                 type="button"
@@ -159,30 +174,99 @@ export default function Home() {
             </div>
 
             <div className="mt-5 grid gap-2">
-              <button type="button" onClick={checkCameraPermission} className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3 text-left hover:bg-[#F4FBFA]">
-                <span className="flex min-w-0 items-center gap-3"><Camera className="h-5 w-5 shrink-0 text-[#159E9D]" /><span className="min-w-0"><strong className="block text-sm text-[#173F53]">Izin Kamera</strong><small className="block truncate text-xs text-[#6A858C]">{cameraStatus}</small></span></span>
-                <span className="shrink-0 text-xs font-bold text-[#159E9D]">Periksa</span>
+              <button
+                type="button"
+                onClick={checkCameraPermission}
+                className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3 text-left hover:bg-[#F4FBFA]"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <Camera className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                  <span className="min-w-0">
+                    <strong className="block text-sm text-[#173F53]">
+                      Izin Kamera
+                    </strong>
+                    <small className="block truncate text-xs text-[#6A858C]">
+                      {cameraStatus}
+                    </small>
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs font-bold text-[#159E9D]">
+                  Periksa
+                </span>
               </button>
 
               <label className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3">
-                <span className="flex min-w-0 items-center gap-3"><Settings className="h-5 w-5 shrink-0 text-[#159E9D]" /><strong className="text-sm text-[#173F53]">Kualitas Model</strong></span>
-                <select value={quality} onChange={(event) => setQuality(event.target.value)} className="max-w-[42%] rounded-lg border border-[#D7EAEC] bg-white px-2 py-1 text-sm text-[#173F53] outline-none focus:border-[#58C6C3]">
-                  <option>Rendah</option><option>Sedang</option><option>Tinggi</option>
+                <span className="flex min-w-0 items-center gap-3">
+                  <Settings className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                  <strong className="text-sm text-[#173F53]">
+                    Kualitas Model
+                  </strong>
+                </span>
+                <select
+                  value={quality}
+                  onChange={(event) => setQuality(event.target.value)}
+                  className="max-w-[42%] rounded-lg border border-[#D7EAEC] bg-white px-2 py-1 text-sm text-[#173F53] outline-none focus:border-[#58C6C3]"
+                >
+                  <option>Rendah</option>
+                  <option>Sedang</option>
+                  <option>Tinggi</option>
                 </select>
               </label>
 
               <label className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3">
-                <span className="flex min-w-0 items-center gap-3"><Volume2 className="h-5 w-5 shrink-0 text-[#159E9D]" /><strong className="text-sm text-[#173F53]">Suara</strong></span>
-                <input type="checkbox" checked={isSoundOn} onChange={(event) => setIsSoundOn(event.target.checked)} className="h-5 w-5 accent-[#159E9D]" />
+                <span className="flex min-w-0 items-center gap-3">
+                  <Volume2 className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                  <strong className="text-sm text-[#173F53]">Suara</strong>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isSoundOn}
+                  onChange={(event) => setIsSoundOn(event.target.checked)}
+                  className="h-5 w-5 accent-[#159E9D]"
+                />
               </label>
 
               <label className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3">
-                <span className="flex min-w-0 items-center gap-3"><Languages className="h-5 w-5 shrink-0 text-[#159E9D]" /><strong className="text-sm text-[#173F53]">Bahasa</strong></span>
-                <select value={language} onChange={(event) => setLanguage(event.target.value)} className="max-w-[42%] rounded-lg border border-[#D7EAEC] bg-white px-2 py-1 text-sm text-[#173F53] outline-none focus:border-[#58C6C3]"><option>Indonesia</option><option>English</option></select>
+                <span className="flex min-w-0 items-center gap-3">
+                  <Languages className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                  <strong className="text-sm text-[#173F53]">Bahasa</strong>
+                </span>
+                <select
+                  value={language}
+                  onChange={(event) => setLanguage(event.target.value)}
+                  className="max-w-[42%] rounded-lg border border-[#D7EAEC] bg-white px-2 py-1 text-sm text-[#173F53] outline-none focus:border-[#58C6C3]"
+                >
+                  <option>Indonesia</option>
+                  <option>English</option>
+                </select>
               </label>
 
-              <button type="button" onClick={resetView} className="flex min-h-16 items-center gap-3 rounded-2xl border border-[#E2EEEE] p-3 text-left hover:bg-[#F4FBFA]"><RotateCcw className="h-5 w-5 shrink-0 text-[#159E9D]" /><span className="min-w-0"><strong className="block text-sm text-[#173F53]">Reset Tampilan</strong><small className="block truncate text-xs text-[#6A858C]">{resetStatus || 'Kembalikan posisi model'}</small></span></button>
-              <div className="flex min-h-16 items-center gap-3 rounded-2xl border border-[#E2EEEE] p-3"><Info className="h-5 w-5 shrink-0 text-[#159E9D]" /><span className="min-w-0"><strong className="block text-sm text-[#173F53]">Informasi Aplikasi</strong><small className="block truncate text-xs text-[#6A858C]">CIKASDA AR · Spatial Viewer · Versi 1.0</small></span></div>
+              <button
+                type="button"
+                onClick={resetView}
+                className="flex min-h-16 items-center gap-3 rounded-2xl border border-[#E2EEEE] p-3 text-left hover:bg-[#F4FBFA]"
+              >
+                <RotateCcw className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                <span className="min-w-0">
+                  <strong className="block text-sm text-[#173F53]">
+                    Reset Tampilan
+                  </strong>
+                  <small className="block truncate text-xs text-[#6A858C]">
+                    {resetStatus || "Kembalikan posisi model"}
+                  </small>
+                </span>
+              </button>
+              <div className="flex min-h-16 items-center gap-3 rounded-2xl border border-[#E2EEEE] p-3">
+                <Info className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                <span className="min-w-0">
+                  <strong className="block text-sm text-[#173F53]">
+                    Informasi Aplikasi
+                  </strong>
+                  <small className="block truncate text-xs text-[#6A858C]">
+                    CIKASDA AR · Spatial Viewer · Versi 1.0
+                  </small>
+                </span>
+              </div>
             </div>
           </section>
         </div>
