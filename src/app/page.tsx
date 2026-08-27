@@ -2,33 +2,43 @@
 
 import dynamic from "next/dynamic";
 import Image from "next/image";
-import {
-  Camera,
-  Info,
-  Languages,
-  RotateCcw,
-  Settings,
-  Volume2,
-  X,
-} from "lucide-react";
+import { Camera, Info, Languages, RotateCcw, Settings, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import ProjectInfo from "../components/ProjectInfo";
+import {
+  Language,
+  LanguageProvider,
+  useLanguage,
+} from "../context/LanguageContext";
+
+function ARViewerLoading() {
+  const { t } = useLanguage();
+
+  return (
+    <div className="flex h-full min-h-[320px] w-full items-center justify-center bg-black px-6 text-center text-white">
+      <p className="text-lg font-semibold">{t.cameraPermission}</p>
+    </div>
+  );
+}
 
 const ARViewer = dynamic(() => import("@/components/ARViewer"), {
   ssr: false,
-  loading: () => (
-    <div className="flex h-full min-h-[320px] w-full items-center justify-center bg-black px-6 text-center text-white">
-      <p className="text-lg font-semibold">Meminta izin kamera...</p>
-    </div>
-  ),
+  loading: () => <ARViewerLoading />,
 });
 
-export default function Home() {
+type CameraStatusKey =
+  | "cameraStatusNotChecked"
+  | "cameraStatusNotSupported"
+  | "cameraStatusActive"
+  | "cameraStatusDenied";
+
+function HomeContent() {
+  const { language, setLanguage, t } = useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [cameraStatus, setCameraStatus] = useState("Belum diperiksa");
-  const [quality, setQuality] = useState("Tinggi");
-  const [isSoundOn, setIsSoundOn] = useState(true);
-  const [language, setLanguage] = useState("Indonesia");
+  const [cameraStatus, setCameraStatus] = useState<CameraStatusKey>(
+    "cameraStatusNotChecked",
+  );
+  const [quality, setQuality] = useState("high");
   const [resetStatus, setResetStatus] = useState("");
 
   useEffect(() => {
@@ -42,22 +52,22 @@ export default function Home() {
 
   const checkCameraPermission = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraStatus("Tidak didukung browser");
+      setCameraStatus("cameraStatusNotSupported");
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       stream.getTracks().forEach((track) => track.stop());
-      setCameraStatus("Izin kamera aktif");
+      setCameraStatus("cameraStatusActive");
     } catch {
-      setCameraStatus("Izin kamera ditolak");
+      setCameraStatus("cameraStatusDenied");
     }
   };
 
   const resetView = () => {
     window.dispatchEvent(new Event("ar-reset-view"));
-    setResetStatus("Tampilan berhasil direset");
+    setResetStatus(t.resetViewSuccess);
     window.setTimeout(() => setResetStatus(""), 2500);
   };
 
@@ -65,7 +75,7 @@ export default function Home() {
     <main className="h-[100svh] overflow-hidden bg-[#02090C] text-[#F4FFFF]">
       <div className="flex h-full flex-col">
         <header className="relative z-30 flex shrink-0 items-center justify-between gap-3 overflow-hidden border-b border-[#DCE8EA] bg-[#FFFFFF] px-3 py-3 shadow-[0_5px_18px_rgba(28,75,88,0.10)] sm:px-6 lg:px-8">
-          <div className="pointer-events-none absolute -left-5 -top-8 h-20 w-28 rounded-br-[42px] rounded-tr-[38px] bg-[#35B7B1] opacity-90" />
+          <div className="pointer-events-none absolute -left-5 -top-8 h-20 w-35 rounded-br-[42px] rounded-tr-[38px] bg-[#35B7B1] opacity-90" />
           <div className="pointer-events-none absolute -right-20 -top-12 h-28 w-56 rounded-[45%] bg-[#DDF5F3] opacity-80" />
           <div className="pointer-events-none absolute left-[46%] top-0 h-16 w-32 opacity-50 [background-image:radial-gradient(#B9D8D9_1px,transparent_1px)] [background-size:7px_7px]" />
 
@@ -75,7 +85,7 @@ export default function Home() {
               alt="CIKASDA"
               width={410}
               height={155}
-              className="h-9 w-auto max-w-[calc(100vw-5rem)] sm:h-11 sm:max-w-none"
+              className="h-8 w-auto max-w-[calc(100vw-5rem)] -translate-y-2 sm:h-7 sm:max-w-none"
             />
           </div>
 
@@ -83,7 +93,7 @@ export default function Home() {
             type="button"
             onClick={() => setIsSettingsOpen(true)}
             className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#E1EAEC] bg-[#FFFFFF] text-[#1B5268] shadow-[0_3px_12px_rgba(25,83,100,0.12)] transition hover:border-[#A9D9D5] hover:bg-[#F2FBFA] hover:text-[#168E82]"
-            aria-label="Settings"
+            aria-label={t.settings}
           >
             <Settings size={22} strokeWidth={1.8} />
           </button>
@@ -111,13 +121,13 @@ export default function Home() {
 
                 <div className="relative z-10 text-left">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#168E82]">
-                    Spatial Object Viewer
+                    {t.spatialObjectViewer}
                   </p>
                   <h2 className="mt-3 break-words text-2xl font-semibold tracking-[-0.04em] text-[#16445A] sm:text-3xl">
-                    Masjid Raya Baitul Khairaat
+                    {t.mosqueName}
                   </h2>
                   <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#5A7B84]">
-                    Marker-based WebAR
+                    {t.markerBasedWebAR}
                   </p>
                 </div>
               </section>
@@ -126,10 +136,10 @@ export default function Home() {
 
               <footer className="flex flex-col items-center justify-between gap-2 border-t border-[#D5E7E7] px-2 pb-2 pt-5 text-center sm:flex-row sm:text-left">
                 <p className="text-sm font-bold tracking-[-0.02em] text-[#16445A]">
-                  CIKASDA <span className="text-[#168E82]">AR</span>
+                  {t.cikasda} <span className="text-[#168E82]">AR</span>
                 </p>
                 <p className="break-words text-xs font-medium text-[#6A858C]">
-                  © 2026 CIKASDA AR · Spatial Object Viewer
+                  {t.copyright}
                 </p>
               </footer>
             </div>
@@ -154,19 +164,19 @@ export default function Home() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#159E9D]">
-                  Pengaturan
+                  {t.settings}
                 </p>
                 <h2
                   id="settings-title"
                   className="mt-1 text-2xl font-bold text-[#173F53]"
                 >
-                  Spatial Viewer
+                  {t.spatialViewer}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setIsSettingsOpen(false)}
-                aria-label="Tutup pengaturan"
+                aria-label={t.closeSettings}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EAF7F5] text-[#168E82] hover:bg-[#D5F0ED]"
               >
                 <X className="h-5 w-5" />
@@ -183,61 +193,34 @@ export default function Home() {
                   <Camera className="h-5 w-5 shrink-0 text-[#159E9D]" />
                   <span className="min-w-0">
                     <strong className="block text-sm text-[#173F53]">
-                      Izin Kamera
+                      {t.cameraPermission}
                     </strong>
                     <small className="block truncate text-xs text-[#6A858C]">
-                      {cameraStatus}
+                      {t[cameraStatus]}
                     </small>
                   </span>
                 </span>
                 <span className="shrink-0 text-xs font-bold text-[#159E9D]">
-                  Periksa
+                  {t.check}
                 </span>
               </button>
 
               <label className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3">
                 <span className="flex min-w-0 items-center gap-3">
-                  <Settings className="h-5 w-5 shrink-0 text-[#159E9D]" />
+                  <Languages className="h-5 w-5 shrink-0 text-[#159E9D]" />
                   <strong className="text-sm text-[#173F53]">
-                    Kualitas Model
+                    {t.language}
                   </strong>
                 </span>
                 <select
-                  value={quality}
-                  onChange={(event) => setQuality(event.target.value)}
-                  className="max-w-[42%] rounded-lg border border-[#D7EAEC] bg-white px-2 py-1 text-sm text-[#173F53] outline-none focus:border-[#58C6C3]"
-                >
-                  <option>Rendah</option>
-                  <option>Sedang</option>
-                  <option>Tinggi</option>
-                </select>
-              </label>
-
-              <label className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3">
-                <span className="flex min-w-0 items-center gap-3">
-                  <Volume2 className="h-5 w-5 shrink-0 text-[#159E9D]" />
-                  <strong className="text-sm text-[#173F53]">Suara</strong>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={isSoundOn}
-                  onChange={(event) => setIsSoundOn(event.target.checked)}
-                  className="h-5 w-5 accent-[#159E9D]"
-                />
-              </label>
-
-              <label className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-[#E2EEEE] p-3">
-                <span className="flex min-w-0 items-center gap-3">
-                  <Languages className="h-5 w-5 shrink-0 text-[#159E9D]" />
-                  <strong className="text-sm text-[#173F53]">Bahasa</strong>
-                </span>
-                <select
                   value={language}
-                  onChange={(event) => setLanguage(event.target.value)}
+                  onChange={(event) =>
+                    setLanguage(event.target.value as Language)
+                  }
                   className="max-w-[42%] rounded-lg border border-[#D7EAEC] bg-white px-2 py-1 text-sm text-[#173F53] outline-none focus:border-[#58C6C3]"
                 >
-                  <option>Indonesia</option>
-                  <option>English</option>
+                  <option value="id">{t.indonesian}</option>
+                  <option value="en">{t.english}</option>
                 </select>
               </label>
 
@@ -249,10 +232,10 @@ export default function Home() {
                 <RotateCcw className="h-5 w-5 shrink-0 text-[#159E9D]" />
                 <span className="min-w-0">
                   <strong className="block text-sm text-[#173F53]">
-                    Reset Tampilan
+                    {t.resetView}
                   </strong>
                   <small className="block truncate text-xs text-[#6A858C]">
-                    {resetStatus || "Kembalikan posisi model"}
+                    {resetStatus || t.resetViewModelPosition}
                   </small>
                 </span>
               </button>
@@ -260,10 +243,10 @@ export default function Home() {
                 <Info className="h-5 w-5 shrink-0 text-[#159E9D]" />
                 <span className="min-w-0">
                   <strong className="block text-sm text-[#173F53]">
-                    Informasi Aplikasi
+                    {t.appInfo}
                   </strong>
                   <small className="block truncate text-xs text-[#6A858C]">
-                    CIKASDA AR · Spatial Viewer · Versi 1.0
+                    {t.cikasda} AR · {t.spatialViewer} · {t.version}
                   </small>
                 </span>
               </div>
@@ -272,5 +255,13 @@ export default function Home() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <LanguageProvider>
+      <HomeContent />
+    </LanguageProvider>
   );
 }

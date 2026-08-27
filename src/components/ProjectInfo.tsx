@@ -1,48 +1,50 @@
-"use client";
-
-import { Bot, Building2, CalendarDays, MapPin, Send, Users, X } from "lucide-react";
+import { Bot, Building2, CalendarDays, MapPin, Users, X } from "lucide-react";
 import { useState } from "react";
 import InfoCard from "./InfoCard";
+import { useLanguage } from "../context/LanguageContext";
 
-const infoCards = [
-  {
-    icon: Building2,
-    label: "Bangunan",
-    value: "Masjid Raya Baitul Khairaat",
-    detail: "Masjid Raya Baitul Khairaat (dahulu dikenal sebagai kawasan Masjid Agung Darussalam) merupakan tempat ibadah umat Islam terbesar di Provinsi Sulawesi Tengah yang berdiri di atas lahan seluas 4 hektare. Bangunan ini mengusung konsep arsitektur modern-kontemporer dengan struktur horizontal ramah lingkungan dan ramah disabilitas. Desain bangunan sarat akan simbolisme numerik Al-Qur'an, seperti tinggi bangunan utama 30 meter (melambangkan 30 juz) dan menara kembar setinggi 66,66 meter (melambangkan 6.666 ayat). Masjid ini memegang dua rekor MURI sekaligus untuk kategori kubah terbesar di Indonesia (diameter 90 meter) dan jam dinding menara terbesar di Indonesia (diameter 19,3 meter).",
-    accent: "bg-[linear-gradient(145deg,#2AA796,#138F87)] text-white shadow-[0_5px_12px_rgba(21,158,145,0.20)]",
-  },
-  {
-    icon: Users,
-    label: "Keterangan",
-    value: "Fungsi Sosial & Ibadah",
-    detail: `Masjid Raya Baitul Khairaat memiliki fungsi sosial, ibadah, dan aktivitas bangunan yang saling mendukung.
-
-  Fungsi Ibadah: Sebagai sarana utama ibadah salat fardu berjemaah, salat Jumat, salat Id, iktikaf, dan pengajian rutin dengan kapasitas daya tampung mencapai 10.000 hingga 15.000 jemaah.
-
-  Fungsi Sosial: Berperan sebagai pusat pemberdayaan umat, pengumpulan dan penyaluran zakat/infak/sedekah (ZIS), serta ruang silaturahmi yang mempererat hubungan antarwarga (Hablum minannas).
-
-  Aktivitas Bangunan: Menjadi pusat syiar Islam, pendidikan Al-Qur'an, kegiatan remas (remaja masjid), hari besar keagamaan, serta kawasan destinasi wisata religi edukatif bagi wisatawan lokal maupun luar daerah.`,
-    accent: "bg-[linear-gradient(145deg,#8D6CE1,#7351C8)] text-white shadow-[0_5px_12px_rgba(115,81,200,0.20)]",
-  },
-  {
-    icon: CalendarDays,
-    label: "Tahun",
-    value: "2025",
-    detail: "Tahun Pendataan & Peresmian: 2025. Tepatnya diresmikan pada 4 Desember 2025 setelah melalui proses pembangunan kembali pascabencana gempa bumi guna memenuhi standar struktur tahan gempa SNI dengan dukungan 483 titik tiang pancang.",
-    accent: "bg-[linear-gradient(145deg,#FFC21A,#F6A900)] text-white shadow-[0_5px_12px_rgba(246,169,0,0.20)]",
-  },
-  {
-    icon: MapPin,
-    label: "Kawasan",
-    value: "Sulawesi Tengah",
-    detail: "Alamat: Jl. Jaelangkara / Jl. WR Supratman, Kelurahan Baru, Kecamatan Palu Barat, Kota Palu, Provinsi Sulawesi Tengah, Kode Pos 94221.\n\nKoordinat Peta: Berada strategis di kawasan pusat kota Palu, tidak jauh dari pesisir Teluk Palu, menjadikannya mudah diakses dari berbagai penjuru kota.",
-    accent: "bg-[linear-gradient(145deg,#2EA6C1,#168CA7)] text-white shadow-[0_5px_12px_rgba(22,140,167,0.20)]",
-  },
-];
+interface InfoCardData {
+  icon: any;
+  label: string;
+  value: string;
+  detail: string;
+  accent: string;
+}
 
 export default function ProjectInfo() {
-  const [selectedCard, setSelectedCard] = useState<(typeof infoCards)[number] | null>(null);
+  const { t } = useLanguage();
+  const [selectedCard, setSelectedCard] = useState<InfoCardData | null>(null);
+
+  const infoCards: InfoCardData[] = [
+    {
+      icon: Building2,
+      label: t.building,
+      value: t.mosqueName,
+      detail: t.buildingDetail,
+      accent: "bg-[linear-gradient(145deg,#2AA796,#138F87)] text-white shadow-[0_5px_12px_rgba(21,158,145,0.20)]",
+    },
+    {
+      icon: Users,
+      label: t.description,
+      value: t.socialWorshipFunction,
+      detail: t.descriptionDetail,
+      accent: "bg-[linear-gradient(145deg,#8D6CE1,#7351C8)] text-white shadow-[0_5px_12px_rgba(115,81,200,0.20)]",
+    },
+    {
+      icon: CalendarDays,
+      label: t.year,
+      value: "2025",
+      detail: t.yearDetail,
+      accent: "bg-[linear-gradient(145deg,#FFC21A,#F6A900)] text-white shadow-[0_5px_12px_rgba(246,169,0,0.20)]",
+    },
+    {
+      icon: MapPin,
+      label: t.area,
+      value: t.centralSulawesi,
+      detail: t.areaDetail,
+      accent: "bg-[linear-gradient(145deg,#2EA6C1,#168CA7)] text-white shadow-[0_5px_12px_rgba(22,140,167,0.20)]",
+    },
+  ];
 
   return (
     <section className="relative overflow-hidden rounded-[24px] border border-[#DDE9E9] bg-[radial-gradient(circle_at_92%_4%,rgba(211,244,242,0.75),transparent_38%),#F9FCFC] p-4 shadow-[0_7px_22px_rgba(32,83,94,0.08)] sm:p-6 lg:p-7">
@@ -51,11 +53,9 @@ export default function ProjectInfo() {
 
       <div className="relative z-10 mb-5">
         <h2 className="max-w-md break-words text-3xl font-extrabold leading-[1.05] tracking-[-0.04em] text-[#173F53] sm:text-4xl">
-          Masjid Raya
-          <br className="hidden sm:block" />
-          Baitul Khairaat
+          {t.mosqueName}
         </h2>
-        <p className="mt-2 text-base font-medium text-[#159E9D]">Proyek Infrastruktur Publik</p>
+        <p className="mt-2 text-base font-medium text-[#159E9D]">{t.projectInfrastructure}</p>
       </div>
 
       <div className="relative z-10 grid gap-3 sm:grid-cols-2">
@@ -74,24 +74,7 @@ export default function ProjectInfo() {
       <div className="relative z-10 mt-4 w-full rounded-[20px] border border-[#E2EEEE] bg-white p-3 shadow-[0_6px_18px_rgba(32,83,94,0.08)] sm:p-4">
         <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#159E9D]">
           <Bot className="h-8 w-8 rounded-full bg-[#EAF7F5] p-1.5 text-[#087C88]" />
-          CHAT ASSISTANT
-        </div>
-
-        <div className="flex gap-3">
-          <input
-            type="text"
-            placeholder="Ketik pertanyaan Anda..."
-            className="h-11 w-full rounded-xl border border-[#D7EAEC] bg-[#FBFDFD] px-3 text-sm text-[#173F53] placeholder:text-[#91A9B0] outline-none transition focus:border-[#58C6C3] focus:shadow-[0_0_15px_rgba(88,198,195,0.16)]"
-            aria-label="Ketik pertanyaan Anda"
-          />
-
-          <button
-            type="button"
-            className="flex h-11 w-14 shrink-0 items-center justify-center rounded-xl bg-[#38B8B8] text-white transition hover:bg-[#249F9F] hover:shadow-[0_0_18px_rgba(56,184,184,0.25)]"
-            aria-label="Kirim pesan"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          {t.chatAssistant}
         </div>
       </div>
 
@@ -120,7 +103,7 @@ export default function ProjectInfo() {
               <button
                 type="button"
                 onClick={() => setSelectedCard(null)}
-                aria-label="Tutup detail informasi"
+                aria-label={t.closeDetail}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF7F5] text-[#168E82] transition hover:bg-[#D5F0ED]"
               >
                 <X className="h-5 w-5" />

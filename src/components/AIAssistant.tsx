@@ -4,6 +4,7 @@ import { Bot, Send, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ChatMessage from "./ChatMessage";
 import QuickQuestions from "./QuickQuestions";
+import { useLanguage } from "../context/LanguageContext";
 
 interface ChatMessageData {
   id: string;
@@ -11,25 +12,26 @@ interface ChatMessageData {
   content: string;
 }
 
-const CHAT_API_URL = "/api/chat"; // Menggunakan Next.js API Route lokal
-
-const quickQuestions = [
-  "Apa fungsi bangunan ini?",
-  "Kapan proyek ini dibuat?",
-  "Di mana lokasi Masjid Raya Baitul Khairaat?",
-];
+const CHAT_API_URL = "/api/chat";
 
 export default function AIAssistant() {
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<ChatMessageData[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "Halo! Ada yang ingin Anda ketahui tentang Masjid Raya Baitul Khairaat?",
+      content: t.aiAssistantWelcome,
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const listRef = useRef<HTMLDivElement | null>(null);
+
+  const quickQuestions = [
+    t.quickQuestionFunction,
+    t.quickQuestionYear,
+    t.quickQuestionLocation,
+  ];
 
   const visibleMessages = useMemo(() => messages, [messages]);
 
@@ -67,7 +69,7 @@ export default function AIAssistant() {
       }
 
       const data = await response.json();
-      const assistantResponse = data.response || "Maaf, terjadi kesalahan saat memproses permintaan Anda.";
+      const assistantResponse = data.response || t.aiAssistantFallback;
 
       setMessages((current) => [
         ...current,
@@ -84,7 +86,7 @@ export default function AIAssistant() {
         {
           id: `error-${Date.now()}`,
           role: "assistant",
-          content: "Maaf, terjadi kesalahan saat menghubungi asisten AI.",
+          content: t.aiAssistantError,
         },
       ]);
     } finally {
@@ -99,7 +101,7 @@ export default function AIAssistant() {
           <Sparkles className="h-4 w-4" />
         </div>
         <h3 className="text-[11px] font-semibold uppercase tracking-[0.25em] text-[#F4FFFF]">
-          AI Assistant
+          {t.aiAssistant}
         </h3>
       </div>
 
@@ -143,14 +145,14 @@ export default function AIAssistant() {
         <input
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="Ketik pertanyaan Anda..."
+          placeholder={t.chatPlaceholder}
           className="h-12 w-full rounded-xl border border-[rgba(90,220,220,0.16)] bg-[rgba(5,20,25,0.8)] px-4 text-sm text-[#F4FFFF] placeholder:text-[#A9C4C7]/70 outline-none transition focus:border-[rgba(93,235,235,0.36)] focus:shadow-[0_0_15px_rgba(93,235,235,0.15)]"
-          aria-label="Ketik pertanyaan Anda"
+          aria-label={t.chatInputLabel}
         />
         <button
           type="submit"
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#5DEBEB] text-[#061419] transition hover:bg-[#69E8E8] hover:shadow-[0_0_18px_rgba(93,235,235,0.25)]"
-          aria-label="Kirim pesan"
+          aria-label={t.sendMessage}
         >
           <Send className="h-4 w-4" />
         </button>
