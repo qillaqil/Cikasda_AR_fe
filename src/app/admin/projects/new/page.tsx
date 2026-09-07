@@ -508,7 +508,7 @@ export default function NewProjectPage() {
                 {[
                   { name: "Masjid Raya", url: "/models/mosque.glb", scale: "0.1 0.1 0.1" },
                   { name: "Bendungan", url: "/models/bendungan.glb", scale: "0.05 0.05 0.05" },
-                  { name: "SPAM", url: "/models/cikasda.glb", scale: "0.2 0.2 0.2" },
+                  { name: "Gedung", url: "/models/cikasda.glb", scale: "0.2 0.2 0.2" },
                 ].map((m) => (
                   <button
                     key={m.url}
