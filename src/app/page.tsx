@@ -33,13 +33,15 @@ type CameraStatusKey =
   | "cameraStatusDenied";
 
 function HomeContent() {
-  const { language, setLanguage, t } = useLanguage();
+  const { language, setLanguage, t, models } = useLanguage();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [cameraStatus, setCameraStatus] = useState<CameraStatusKey>(
     "cameraStatusNotChecked",
   );
-  const [quality, setQuality] = useState("high");
   const [resetStatus, setResetStatus] = useState("");
+  const [activeTargetIndex, setActiveTargetIndex] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -71,11 +73,14 @@ function HomeContent() {
     window.setTimeout(() => setResetStatus(""), 2500);
   };
 
+  const currentModel =
+    activeTargetIndex !== null ? models[activeTargetIndex] : null;
+
   return (
     <main className="h-[100svh] overflow-hidden bg-[#02090C] text-[#F4FFFF]">
       <div className="flex h-full flex-col">
         <header className="relative z-30 flex shrink-0 items-center justify-between gap-3 overflow-hidden border-b border-[#DCE8EA] bg-[#FFFFFF] px-3 py-3 shadow-[0_5px_18px_rgba(28,75,88,0.10)] sm:px-6 lg:px-8">
-          <div className="pointer-events-none absolute -left-5 -top-8 h-20 w-35 rounded-br-[42px] rounded-tr-[38px] bg-[#35B7B1] opacity-90" />
+          <div className="pointer-events-none absolute -left-5 -top-8 h-20 w-36 rounded-br-[42px] rounded-tr-[38px] bg-[#35B7B1] opacity-90" />
           <div className="pointer-events-none absolute -right-20 -top-12 h-28 w-56 rounded-[45%] bg-[#DDF5F3] opacity-80" />
           <div className="pointer-events-none absolute left-[46%] top-0 h-16 w-32 opacity-50 [background-image:radial-gradient(#B9D8D9_1px,transparent_1px)] [background-size:7px_7px]" />
 
@@ -101,7 +106,10 @@ function HomeContent() {
 
         <div className="relative min-h-0 flex-1 overflow-y-auto scroll-smooth snap-y snap-mandatory">
           <section className="relative h-full snap-start overflow-hidden bg-black">
-            <ARViewer />
+            <ARViewer
+              activeTargetIndex={activeTargetIndex}
+              setActiveTargetIndex={setActiveTargetIndex}
+            />
 
             <div className="absolute inset-x-0 bottom-6 z-30 flex justify-center">
               <div className="flex h-10 w-24 cursor-grab flex-col items-center justify-center gap-1 active:cursor-grabbing">
@@ -121,10 +129,14 @@ function HomeContent() {
 
                 <div className="relative z-10 text-left">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.26em] text-[#168E82]">
-                    {t.spatialObjectViewer}
+                    {currentModel
+                      ? currentModel.category
+                      : t.spatialObjectViewer}
                   </p>
                   <h2 className="mt-3 break-words text-2xl font-semibold tracking-[-0.04em] text-[#16445A] sm:text-3xl">
-                    {t.mosqueName}
+                    {currentModel
+                      ? currentModel.title
+                      : t.projectInfrastructure}
                   </h2>
                   <p className="mt-1 text-[10px] font-medium uppercase tracking-[0.18em] text-[#5A7B84]">
                     {t.markerBasedWebAR}
@@ -132,7 +144,7 @@ function HomeContent() {
                 </div>
               </section>
 
-              <ProjectInfo />
+              <ProjectInfo activeTargetIndex={activeTargetIndex} />
 
               <footer className="flex flex-col items-center justify-between gap-2 border-t border-[#D5E7E7] px-2 pb-2 pt-5 text-center sm:flex-row sm:text-left">
                 <p className="text-sm font-bold tracking-[-0.02em] text-[#16445A]">
@@ -239,6 +251,7 @@ function HomeContent() {
                   </small>
                 </span>
               </button>
+
               <div className="flex min-h-16 items-center gap-3 rounded-2xl border border-[#E2EEEE] p-3">
                 <Info className="h-5 w-5 shrink-0 text-[#159E9D]" />
                 <span className="min-w-0">

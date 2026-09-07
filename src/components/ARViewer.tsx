@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "../context/LanguageContext";
 
 declare global {
   interface Window {
@@ -66,11 +67,10 @@ type GestureCustomEvent = CustomEvent<GestureEventDetail>;
 
 const AFRAME_SCRIPT_ID = "aframe-runtime-script";
 const MINDAR_SCRIPT_ID = "mindar-image-aframe-script";
-const AFRAME_SCRIPT_URL = "https://aframe.io/releases/1.5.0/aframe.min.js";
+const AFRAME_SCRIPT_URL = "https://aframe.io/releases/1.4.2/aframe.min.js";
 const MINDAR_SCRIPT_URL =
   "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js";
 const IMAGE_TARGET_URL = "/markers/targets.mind";
-const MODEL_URL = process.env.NEXT_PUBLIC_MODEL_URL!;
 
 function loadScript(id: string, src: string) {
   return new Promise<void>((resolve, reject) => {
@@ -244,16 +244,18 @@ function registerGestureComponents() {
             return;
           }
 
-          if (!this.initialScale) {
+          if (this.initialScale === undefined) {
             this.initialScale = this.targetElement.object3D.scale.x || 0.1;
+            this.scaleFactor = 1;
           }
 
+          const currentScaleFactor = this.scaleFactor ?? 1;
           this.scaleFactor = Math.min(
             5,
-            Math.max(0.5, (this.scaleFactor || 1) + spreadChange / 250),
+            Math.max(0.2, currentScaleFactor + spreadChange / 250),
           );
 
-          const nextScale = this.initialScale * this.scaleFactor;
+          const nextScale = (this.initialScale ?? 0.1) * this.scaleFactor;
           this.targetElement.object3D.scale.set(
             nextScale,
             nextScale,
@@ -286,14 +288,82 @@ function registerGestureComponents() {
       },
     });
   }
+
+  if (!aframe.components["marker-listener"]) {
+    aframe.registerComponent("marker-listener", {
+      init() {
+        // Fungsi helper aman untuk mengambil angka targetIndex
+        const getIndex = (el: HTMLElement): number | null => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const raw: any = el.getAttribute("mindar-image-target");
+          if (!raw) return null;
+
+          // Jika A-Frame mengembalikannya sebagai Objek { targetIndex: 0 }
+          if (typeof raw === "object" && "targetIndex" in raw) {
+            return Number(raw.targetIndex);
+          }
+
+          // Jika A-Frame mengembalikannya sebagai String "targetIndex: 0"
+          if (typeof raw === "string") {
+            const matchResult = raw.match(/\d+/);
+            return matchResult ? Number(matchResult[0]) : null;
+          }
+
+          return null;
+        };
+
+        this.el.addEventListener("targetFound", () => {
+          const targetIndex = getIndex(this.el);
+          if (targetIndex !== null) {
+            window.dispatchEvent(
+              new CustomEvent("marker-found", { detail: { targetIndex } }),
+            );
+          }
+        });
+
+        this.el.addEventListener("targetLost", () => {
+          const targetIndex = getIndex(this.el);
+          if (targetIndex !== null) {
+            window.dispatchEvent(
+              new CustomEvent("marker-lost", { detail: { targetIndex } }),
+            );
+          }
+        });
+      },
+    });
+  }
 }
 
-export default function ARViewer() {
+interface ARViewerProps {
+  activeTargetIndex: number | null;
+  setActiveTargetIndex: (index: number | null) => void;
+}
+
+export default function ARViewer({
+  activeTargetIndex,
+  setActiveTargetIndex,
+}: ARViewerProps) {
+  const { models, t } = useLanguage();
   const sceneRef = useRef<AFrameElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [scriptsReady, setScriptsReady] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleMarkerFound = (e: Event) =>
+      setActiveTargetIndex((e as CustomEvent).detail.targetIndex);
+
+    const handleMarkerLost = () => {
+      setActiveTargetIndex(null);
+    };
+
+    window.addEventListener("marker-found", handleMarkerFound);
+    window.addEventListener("marker-lost", handleMarkerLost);
+
+    return () => {
+      window.removeEventListener("marker-found", handleMarkerFound);
+      window.removeEventListener("marker-lost", handleMarkerLost);
+    };
+  }, [setActiveTargetIndex]);
 
   useEffect(() => {
     let mounted = true;
@@ -315,7 +385,7 @@ export default function ARViewer() {
         }
       } catch (error) {
         if (mounted) {
-          setLoadError(
+          console.error(
             error instanceof Error
               ? error.message
               : "Gagal menyiapkan WebAR di browser ini.",
@@ -348,14 +418,46 @@ export default function ARViewer() {
           videoRef.current.srcObject = stream;
           videoRef.current.play();
         }
-        setCameraReady(true);
-      } catch (e) {
-        setLoadError("Izin kamera ditolak.");
+      } catch {
+        console.error("Izin kamera ditolak.");
       }
     }
     startCamera();
     return () => {
       cancelled = true;
+    };
+  }, [scriptsReady]);
+
+  // Memulai sistem MindAR secara aman setelah scene A-Frame selesai dimuat
+  useEffect(() => {
+    if (!scriptsReady) return;
+
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const startARWhenLoaded = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const arSystem = (scene as any).systems?.["mindar-image-system"];
+      if (arSystem && !arSystem.started) {
+        console.log("[ARViewer] Starting MindAR system...");
+        try {
+          arSystem.start();
+          console.log("[ARViewer] MindAR system started successfully (synchronous)");
+        } catch (err) {
+          console.error("[ARViewer] Failed to start MindAR (synchronous):", err);
+        }
+      }
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((scene as any).hasLoaded) {
+      startARWhenLoaded();
+    } else {
+      scene.addEventListener("loaded", startARWhenLoaded, { once: true });
+    }
+
+    return () => {
+      scene.removeEventListener("loaded", startARWhenLoaded);
     };
   }, [scriptsReady]);
 
@@ -368,12 +470,11 @@ export default function ARViewer() {
         muted
         playsInline
       />
-
       {scriptsReady ? (
         <>
           <a-scene
             ref={sceneRef}
-            mindar-image={`imageTargetSrc: ${IMAGE_TARGET_URL}; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;`}
+            mindar-image={`imageTargetSrc: ${IMAGE_TARGET_URL}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
             color-space="sRGB"
             renderer="colorManagement: true; alpha: true; antialias: true"
             vr-mode-ui="enabled: false"
@@ -383,31 +484,48 @@ export default function ARViewer() {
             class="absolute inset-0 z-10 block h-full w-full"
             style={{ height: "100%", width: "100%", background: "transparent" }}
           >
+            {/* DAFTARKAN ASSET MODEL SECARA DINAMIS */}
             <a-assets timeout="10000">
-              <a-asset-item id="mosque-model" src={MODEL_URL}></a-asset-item>
+              {models.map((item) => (
+                <a-asset-item
+                  key={`asset-${item.id}`}
+                  id={`model-${item.id}`}
+                  src={item.modelUrl}
+                ></a-asset-item>
+              ))}
             </a-assets>
 
-            <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+            <a-camera
+              position="0 0 0"
+              look-controls="enabled: false"
+            ></a-camera>
 
-            <a-entity mindar-image-target="targetIndex: 0">
-              <a-entity light="type: ambient; intensity: 1.2"></a-entity>
+            {/* DAFTARKAN TARGET MARKER DAN MODEL 3D */}
+            {models.map((item, index) => (
               <a-entity
-                light="type: directional; intensity: 0.8"
-                position="0 1 1"
-              ></a-entity>
-              <a-gltf-model
-                src="#mosque-model"
-                position="0 0 0"
-                scale="0.1 0.1 0.1"
-                rotation="0 0 0"
-                gesture-handler=""
-              ></a-gltf-model>
-            </a-entity>
+                key={`target-${item.id}`}
+                mindar-image-target={`targetIndex: ${index}`}
+                marker-listener=""
+              >
+                <a-entity light="type: ambient; intensity: 1.2"></a-entity>
+                <a-entity
+                  light="type: directional; intensity: 0.8"
+                  position="0 1 1"
+                ></a-entity>
+                <a-gltf-model
+                  src={`#model-${item.id}`}
+                  position="0 0 0"
+                  scale={item.scale}
+                  rotation="0 0 0"
+                  gesture-handler=""
+                ></a-gltf-model>
+              </a-entity>
+            ))}
           </a-scene>
 
           <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
             <div className="rounded-full bg-black/55 px-4 py-2 text-center text-xs text-white/85">
-              Geser satu jari untuk rotate · Cubit dua jari untuk zoom
+              {t.rotateGesture} · {t.zoomGesture}
             </div>
           </div>
         </>
