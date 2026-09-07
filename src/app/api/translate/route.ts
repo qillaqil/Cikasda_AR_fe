@@ -1,7 +1,46 @@
 import { NextResponse } from "next/server";
 
+// In-memory rate limiter for translation (10 requests per minute per IP)
+const translateRateLimitMap = new Map<string, { count: number; lastReset: number }>();
+const TRANSLATE_RATE_LIMIT = 10;
+const TRANSLATE_WINDOW_MS = 60 * 1000;
+const MAX_STORED_IPS = 1000;
+
+function cleanupTranslateRateLimitMap(now: number) {
+  if (translateRateLimitMap.size > MAX_STORED_IPS) {
+    for (const [key, value] of translateRateLimitMap.entries()) {
+      if (now - value.lastReset > TRANSLATE_WINDOW_MS) {
+        translateRateLimitMap.delete(key);
+      }
+    }
+  }
+}
+
 export async function POST(req: Request) {
   try {
+    const rawIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "anonymous";
+    const ip = rawIp.split(",")[0].trim();
+    const now = Date.now();
+
+    cleanupTranslateRateLimitMap(now);
+
+    const clientLimit = translateRateLimitMap.get(ip) || { count: 0, lastReset: now };
+
+    if (now - clientLimit.lastReset > TRANSLATE_WINDOW_MS) {
+      clientLimit.count = 0;
+      clientLimit.lastReset = now;
+    }
+
+    if (clientLimit.count >= TRANSLATE_RATE_LIMIT) {
+      return NextResponse.json(
+        { error: "Terlalu banyak permintaan terjemahan. Silakan tunggu 1 menit sebelum mencoba lagi." },
+        { status: 429 }
+      );
+    }
+
+    clientLimit.count++;
+    translateRateLimitMap.set(ip, clientLimit);
+
     const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
@@ -13,6 +52,19 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { title, category, description, cards } = body;
+
+    // Strict input length validation against token-exhaustion DoS
+    if (
+      (title && typeof title === "string" && title.length > 500) ||
+      (description && typeof description === "string" && description.length > 3000) ||
+      (category && typeof category === "string" && category.length > 200) ||
+      (cards && Array.isArray(cards) && cards.length > 8)
+    ) {
+      return NextResponse.json(
+        { error: "Ukuran konten melebihi batas yang diizinkan untuk keamanan." },
+        { status: 400 }
+      );
+    }
 
     const systemPrompt = `You are a professional translator and technical editor for Dinas CIKASDA (Cipta Karya & Sumber Daya Air - Public Works & Water Resources Department) Central Sulawesi, Indonesia.
 Your task is to translate government public infrastructure project information from Indonesian to formal, professional English.
@@ -66,6 +118,7 @@ Respond ONLY with valid JSON in this exact schema:
         response_format: { type: "json_object" },
         temperature: 0.2,
       }),
+      signal: AbortSignal.timeout(25000), // 25s timeout protection
     });
 
     if (!groqResponse.ok) {
