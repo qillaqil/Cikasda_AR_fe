@@ -86,11 +86,12 @@ function HomeContent() {
 
           <div className="relative flex min-w-0 items-center gap-2">
             <Image
-              src="/cikasda.webp"
+              src="/logo-cikasda-v2.webp"
               alt="CIKASDA"
               width={410}
               height={155}
-              className="h-8 w-auto max-w-[calc(100vw-5rem)] -translate-y-2 sm:h-7 sm:max-w-none"
+              className="h-8 w-auto max-w-[calc(100vw-5rem)] object-contain sm:h-9 sm:max-w-none"
+              priority
             />
           </div>
 

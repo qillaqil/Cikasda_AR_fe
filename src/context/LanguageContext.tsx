@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 
 export type Language = "id" | "en";
 
@@ -386,11 +386,14 @@ export const arModels: Record<Language, ARModelData[]> = {
   ],
 };
 
+import { createClient } from "../lib/supabase/client";
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (language: Language) => void;
   t: Record<TranslationKey, string>;
   models: ARModelData[];
+  mindarTargetUrl: string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
@@ -399,6 +402,81 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("id");
+  const [dynamicModels, setDynamicModels] = useState<Record<Language, ARModelData[]>>(arModels);
+  const [mindarTargetUrl, setMindarTargetUrl] = useState<string>("/markers/targets.mind");
+
+  useEffect(() => {
+    const supabase = createClient();
+    async function loadData() {
+      try {
+        const { data, error } = await supabase
+          .from("ar_projects")
+          .select("*, cards:ar_project_cards(*)")
+          .eq("is_active", true)
+          .order("target_index", { ascending: true });
+
+        if (!error && data && data.length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const idModels: ARModelData[] = data.map((item: any) => ({
+            id: item.target_index,
+            title: item.title_id,
+            category: item.category_id,
+            description: item.description_id,
+            modelUrl: item.model_url,
+            scale: item.model_scale || "0.1 0.1 0.1",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cards: (item.cards || [])
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .sort((a: any, b: any) => a.slot_index - b.slot_index)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((c: any) => ({
+                label: c.label_id,
+                value: c.value_id,
+                detail: c.detail_id,
+              })),
+          }));
+
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const enModels: ARModelData[] = data.map((item: any) => ({
+            id: item.target_index,
+            title: item.title_en || item.title_id,
+            category: item.category_en || item.category_id,
+            description: item.description_en || item.description_id,
+            modelUrl: item.model_url,
+            scale: item.model_scale || "0.1 0.1 0.1",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cards: (item.cards || [])
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .sort((a: any, b: any) => a.slot_index - b.slot_index)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((c: any) => ({
+                label: c.label_en || c.label_id,
+                value: c.value_en || c.value_id,
+                detail: c.detail_en || c.detail_id,
+              })),
+          }));
+
+          setDynamicModels({ id: idModels, en: enModels });
+        }
+
+        const { data: bundleData } = await supabase
+          .from("mindar_bundles")
+          .select("bundle_url")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (bundleData?.bundle_url) {
+          setMindarTargetUrl(bundleData.bundle_url);
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    }
+
+    loadData();
+  }, []);
 
   return (
     <LanguageContext.Provider
@@ -406,7 +484,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         language,
         setLanguage,
         t: translations[language],
-        models: arModels[language],
+        models: dynamicModels[language],
+        mindarTargetUrl,
       }}
     >
       {children}
@@ -423,3 +502,4 @@ export function useLanguage() {
 
   return context;
 }
+

@@ -343,7 +343,8 @@ export default function ARViewer({
   activeTargetIndex,
   setActiveTargetIndex,
 }: ARViewerProps) {
-  const { models, t } = useLanguage();
+  const { models, t, mindarTargetUrl } = useLanguage();
+  const activeTargetUrl = mindarTargetUrl || IMAGE_TARGET_URL;
   const sceneRef = useRef<AFrameElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [scriptsReady, setScriptsReady] = useState(false);
@@ -474,7 +475,7 @@ export default function ARViewer({
         <>
           <a-scene
             ref={sceneRef}
-            mindar-image={`imageTargetSrc: ${IMAGE_TARGET_URL}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
+            mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
             color-space="sRGB"
             renderer="colorManagement: true; alpha: true; antialias: true"
             vr-mode-ui="enabled: false"
