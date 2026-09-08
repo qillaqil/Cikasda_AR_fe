@@ -79,13 +79,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const chatApiUrl = process.env.CHAT_API_URL;
-    if (!chatApiUrl) {
-      return NextResponse.json(
-        { error: "Layanan chatbot belum dikonfigurasi di server." },
-        { status: 503 }
-      );
-    }
+    const chatApiUrl =
+      process.env.CHAT_API_URL || "https://cikasda-ar-be.vercel.app/api/chat";
 
     // Proxy with timeout to prevent hanging connections
     const response = await fetch(chatApiUrl, {
