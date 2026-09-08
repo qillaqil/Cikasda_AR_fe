@@ -11,10 +11,13 @@ import {
 import { useProjects } from "@/lib/hooks/useProjects";
 import ModelViewer3D from "@/components/admin/ModelViewer3D";
 import GLBUploader from "@/components/admin/GLBUploader";
+import { getPublicStorageUrl } from "@/lib/supabase/client";
 
 export default function AdminModelsPage() {
   const { projects } = useProjects();
-  const [selectedModelUrl, setSelectedModelUrl] = useState("/models/mosque.glb");
+  const [selectedModelUrl, setSelectedModelUrl] = useState(
+    getPublicStorageUrl("ar-models", "mosque.glb")
+  );
   const [selectedModelScale, setSelectedModelScale] = useState("0.1 0.1 0.1");
   const [selectedTitle, setSelectedTitle] = useState("Masjid Raya Baitul Khairaat");
   const [copied, setCopied] = useState(false);

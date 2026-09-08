@@ -16,7 +16,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getPublicStorageUrl } from "@/lib/supabase/client";
 import { useProjects } from "@/lib/hooks/useProjects";
 import GLBUploader from "@/components/admin/GLBUploader";
 import ModelViewer3D from "@/components/admin/ModelViewer3D";
@@ -46,7 +46,9 @@ export default function EditProjectPage() {
   const [descEn, setDescEn] = useState("");
 
   // 3D Model & Marker
-  const [modelUrl, setModelUrl] = useState("/models/mosque.glb");
+  const [modelUrl, setModelUrl] = useState(
+    getPublicStorageUrl("ar-models", "mosque.glb")
+  );
   const [modelScale, setModelScale] = useState("0.1 0.1 0.1");
   const [markerImageUrl, setMarkerImageUrl] = useState("/contohAR.png");
 

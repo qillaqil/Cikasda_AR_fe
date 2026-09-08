@@ -1,8 +1,9 @@
 "use client";
 
-import { Bot, Building2, CalendarDays, MapPin, Users, X } from "lucide-react";
+import { Building2, CalendarDays, MapPin, Users, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LucideIcon } from "lucide-react";
+import AIAssistant from "./AIAssistant";
 import InfoCard from "./InfoCard";
 import { useLanguage } from "../context/LanguageContext";
 
@@ -107,11 +108,8 @@ export default function ProjectInfo({ activeTargetIndex }: ProjectInfoProps) {
         ))}
       </div>
 
-      <div className="relative z-10 mt-4 w-full rounded-[20px] border border-[#E2EEEE] bg-white p-3 shadow-[0_6px_18px_rgba(32,83,94,0.08)] sm:p-4">
-        <div className="mb-3 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.22em] text-[#159E9D]">
-          <Bot className="h-8 w-8 rounded-full bg-[#EAF7F5] p-1.5 text-[#087C88]" />
-          {t.chatAssistant}
-        </div>
+      <div className="relative z-10 mt-4">
+        <AIAssistant />
       </div>
 
       {selectedCard && (

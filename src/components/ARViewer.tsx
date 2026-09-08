@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { useLanguage } from "../context/LanguageContext";
+import { getPublicStorageUrl } from "../lib/supabase/client";
 
 declare global {
   interface Window {
@@ -70,7 +72,8 @@ const MINDAR_SCRIPT_ID = "mindar-image-aframe-script";
 const AFRAME_SCRIPT_URL = "https://aframe.io/releases/1.4.2/aframe.min.js";
 const MINDAR_SCRIPT_URL =
   "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js";
-const IMAGE_TARGET_URL = "/markers/targets.mind";
+const IMAGE_TARGET_URL =
+  getPublicStorageUrl("ar-markers", "targets.mind");
 
 function loadScript(id: string, src: string) {
   return new Promise<void>((resolve, reject) => {
@@ -346,8 +349,9 @@ export default function ARViewer({
   const { models, t, mindarTargetUrl } = useLanguage();
   const activeTargetUrl = mindarTargetUrl || IMAGE_TARGET_URL;
   const sceneRef = useRef<AFrameElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [scriptsReady, setScriptsReady] = useState(false);
+  const [arReady, setArReady] = useState(false);
+  const [arError, setArError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleMarkerFound = (e: Event) =>
@@ -391,6 +395,7 @@ export default function ARViewer({
               ? error.message
               : "Gagal menyiapkan WebAR di browser ini.",
           );
+          setArError("Browser tidak mendukung WebAR atau izin kamera dibatasi.");
         }
       }
     }
@@ -402,50 +407,51 @@ export default function ARViewer({
     };
   }, []);
 
-  useEffect(() => {
-    if (!scriptsReady) return;
-
-    let cancelled = false;
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment" },
-        });
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play();
-        }
-      } catch {
-        console.error("Izin kamera ditolak.");
-      }
-    }
-    startCamera();
-    return () => {
-      cancelled = true;
-    };
-  }, [scriptsReady]);
-
-  // Memulai sistem MindAR secara aman setelah scene A-Frame selesai dimuat
+  // Lifecycle handler untuk MindAR
   useEffect(() => {
     if (!scriptsReady) return;
 
     const scene = sceneRef.current;
     if (!scene) return;
 
+    let isSubscribed = true;
+
+    const handleArReady = () => {
+      if (isSubscribed) {
+        console.log("[ARViewer] MindAR siap dan aktif melacak marker.");
+        setArReady(true);
+      }
+    };
+
+    const handleArError = (event: Event) => {
+      if (isSubscribed) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const detail = (event as any).detail;
+        console.error("[ARViewer] MindAR arError:", detail);
+        setArError(detail?.error || "Gagal memulai kamera WebAR.");
+      }
+    };
+
+    scene.addEventListener("arReady", handleArReady);
+    scene.addEventListener("arError", handleArError);
+
     const startARWhenLoaded = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const arSystem = (scene as any).systems?.["mindar-image-system"];
-      if (arSystem && !arSystem.started) {
-        console.log("[ARViewer] Starting MindAR system...");
+      if (arSystem && !arSystem.video) {
+        console.log("[ARViewer] Memulai sistem MindAR...");
         try {
-          arSystem.start();
-          console.log("[ARViewer] MindAR system started successfully (synchronous)");
+          const startPromise = arSystem.start();
+          if (startPromise && typeof startPromise.then === "function") {
+            startPromise.catch((err: unknown) => {
+              console.error("[ARViewer] arSystem.start() error:", err);
+              if (isSubscribed) {
+                setArError("Gagal membuka kamera perangkat.");
+              }
+            });
+          }
         } catch (err) {
-          console.error("[ARViewer] Failed to start MindAR (synchronous):", err);
+          console.error("[ARViewer] Gagal memanggil arSystem.start():", err);
         }
       }
     };
@@ -457,74 +463,160 @@ export default function ARViewer({
       scene.addEventListener("loaded", startARWhenLoaded, { once: true });
     }
 
+    const observer = new MutationObserver(() => {
+      const videoEl = scene?.parentElement?.querySelector("video");
+      if (videoEl) {
+        videoEl.style.zIndex = "1";
+        videoEl.style.position = "absolute";
+        videoEl.style.width = "100%";
+        videoEl.style.height = "100%";
+        videoEl.style.objectFit = "cover";
+      }
+    });
+
+    if (scene?.parentElement) {
+      observer.observe(scene.parentElement, { childList: true });
+    }
+
     return () => {
+      isSubscribed = false;
+      observer.disconnect();
+      scene.removeEventListener("arReady", handleArReady);
+      scene.removeEventListener("arError", handleArError);
       scene.removeEventListener("loaded", startARWhenLoaded);
+
+      // Pastikan hardware kamera dan MindAR system dimatikan dengan bersih saat komponen unmount
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const arSystem = (scene as any)?.systems?.["mindar-image-system"];
+        if (arSystem && typeof arSystem.stop === "function") {
+          arSystem.stop();
+        }
+        const videoEl = scene?.parentElement?.querySelector("video");
+        if (videoEl && videoEl.srcObject) {
+          const stream = videoEl.srcObject as MediaStream;
+          stream.getTracks().forEach((track) => track.stop());
+        }
+      } catch (err) {
+        console.warn("[ARViewer] Gagal menghentikan stream kamera saat unmount:", err);
+      }
     };
   }, [scriptsReady]);
 
   return (
-    <section className="relative h-full min-h-[320px] w-full overflow-hidden rounded-[22px] bg-black text-white">
-      <video
-        ref={videoRef}
-        className="absolute inset-0 h-full w-full object-cover"
-        autoPlay
-        muted
-        playsInline
-      />
-      {scriptsReady && models.length > 0 && activeTargetUrl.startsWith("http") ? (
-        <a-scene
-          ref={sceneRef}
-          mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
-          color-space="sRGB"
-          renderer="colorManagement: true; alpha: true; antialias: true"
-          vr-mode-ui="enabled: false"
-          device-orientation-permission-ui="enabled: false"
-          embedded
-          gesture-detector=""
-          class="absolute inset-0 z-10 block h-full w-full"
-          style={{ height: "100%", width: "100%", background: "transparent" }}
-        >
-          <a-assets timeout="10000">
-            {models.map((item) => (
-              <a-asset-item
-                key={`asset-${item.id}`}
-                id={`model-${item.id}`}
-                src={item.modelUrl}
-              ></a-asset-item>
-            ))}
-          </a-assets>
+    <section className="ar-viewport relative h-full min-h-[320px] w-full overflow-hidden rounded-[22px] bg-transparent text-white">
+      <style jsx global>{`
+        .ar-viewport video {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          z-index: 1 !important;
+        }
+        .ar-viewport a-scene {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          z-index: 2 !important;
+        }
+        .mindar-ui-overlay {
+          display: none !important;
+        }
+      `}</style>
 
-          <a-camera
-            position="0 0 0"
-            look-controls="enabled: false"
-          ></a-camera>
+      {/* Loading Overlay saat kamera & tracking sedang diinisialisasi */}
+      {!arReady && !arError && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 px-6 text-center text-white backdrop-blur-xs">
+          <Loader2 className="mb-3 h-8 w-8 animate-spin text-teal-400" />
+          <p className="text-sm font-semibold tracking-wide">
+            Menyiapkan Scanner & Kamera AR...
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Arahkan kamera ke gambar marker setelah kamera menyala
+          </p>
+        </div>
+      )}
 
-          {models.map((item, index) => (
-            <a-entity
-              key={`target-${item.id}`}
-              mindar-image-target={`targetIndex: ${index}`}
-              marker-listener=""
+      {/* Error state jika izin kamera ditolak atau gagal */}
+      {arError && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 px-6 text-center text-white">
+          <div className="max-w-sm rounded-xl border border-rose-500/30 bg-rose-950/40 p-5">
+            <p className="mb-1 text-sm font-bold text-rose-400">
+              Kendala Kamera WebAR
+            </p>
+            <p className="mb-3 text-xs text-slate-300">
+              {arError === "VIDEO_FAIL"
+                ? "Kamera tidak dapat diakses atau izin kamera belum diberikan. Pastikan izin kamera aktif dan muat ulang halaman."
+                : arError}
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-teal-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 transition-colors"
             >
-              <a-entity light="type: ambient; intensity: 1.2"></a-entity>
+              Muat Ulang
+            </button>
+          </div>
+        </div>
+      )}
+
+      {scriptsReady ? (
+        <>
+          <a-scene
+            ref={sceneRef}
+            mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;`}
+            color-space="sRGB"
+            renderer="colorManagement: true; alpha: true; antialias: true"
+            vr-mode-ui="enabled: false"
+            device-orientation-permission-ui="enabled: false"
+            embedded
+            gesture-detector=""
+            class="absolute inset-0 z-10 block h-full w-full"
+            style={{ height: "100%", width: "100%", background: "transparent" }}
+          >
+            <a-camera
+              position="0 0 0"
+              look-controls="enabled: false"
+            ></a-camera>
+
+            {models.map((item) => (
               <a-entity
-                light="type: directional; intensity: 0.8"
-                position="0 1 1"
-              ></a-entity>
-              {item.modelUrl && item.modelUrl.startsWith("http") && (
-                <a-gltf-model
-                  src={`#model-${item.id}`}
-                  position="0 0 0"
-                  scale={item.scale || "0.1 0.1 0.1"}
-                  rotation="0 0 0"
-                  gesture-handler=""
-                ></a-gltf-model>
-              )}
-            </a-entity>
-          ))}
-        </a-scene>
+                key={`target-${item.id}`}
+                mindar-image-target={`targetIndex: ${item.id}`}
+                marker-listener=""
+              >
+                <a-entity light="type: ambient; intensity: 1.2"></a-entity>
+                <a-entity
+                  light="type: directional; intensity: 0.8"
+                  position="0 1 1"
+                ></a-entity>
+                {item.modelUrl && (
+                  <a-gltf-model
+                    src={item.modelUrl}
+                    position="0 0 0"
+                    scale={item.scale || "0.1 0.1 0.1"}
+                    rotation="0 0 0"
+                    gesture-handler=""
+                  ></a-gltf-model>
+                )}
+              </a-entity>
+            ))}
+          </a-scene>
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+            <div className="rounded-full bg-black/55 px-4 py-2 text-center text-xs text-white/85">
+              {t.rotateGesture} · {t.zoomGesture}
+            </div>
+          </div>
+        </>
       ) : (
         <div className="flex h-full w-full items-center justify-center text-white">
-          Loading AR Resources...
+          <Loader2 className="h-6 w-6 animate-spin text-teal-400 mr-2" />
+          <span className="text-xs">Memuat A-Frame Runtime...</span>
         </div>
       )}
     </section>

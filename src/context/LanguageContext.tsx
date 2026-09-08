@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createClient, getPublicStorageUrl } from "../lib/supabase/client";
 
 export type Language = "id" | "en";
 
@@ -177,7 +178,7 @@ export const arModels: Record<Language, ARModelData[]> = {
       category: "Bangunan Gedung & Religi",
       description:
         "Tempat ibadah umat Islam terbesar di Sulawesi Tengah berkonsep modern-kontemporer tahan gempa.",
-      modelUrl: "/models/mosque.glb",
+      modelUrl: getPublicStorageUrl("ar-models", "mosque.glb"),
       scale: "0.1 0.1 0.1",
       cards: [
         {
@@ -212,7 +213,7 @@ export const arModels: Record<Language, ARModelData[]> = {
       category: "Sumber Daya Air (SDA)",
       description:
         "Infrastruktur penampungan dan pengelolaan air strategis untuk mendukung irigasi pertanian daerah.",
-      modelUrl: "/models/bendungan.glb",
+      modelUrl: getPublicStorageUrl("ar-models", "bendungan.glb"),
       scale: "0.05 0.05 0.05",
       cards: [
         {
@@ -243,11 +244,11 @@ export const arModels: Record<Language, ARModelData[]> = {
     },
     {
       id: 2,
-      title: "Jaringan SPAM Regional",
+      title: "Gedung Dinas Cipta Karya & Sumber Daya Air",
       category: "Cipta Karya & Air Minum",
       description:
-        "Sistem Penyediaan Air Minum terpadu untuk menjamin ketersediaan air bersih pemukiman warga.",
-      modelUrl: "/models/cikasda.glb",
+        "Sistem Penyediaan Air Minum terpadu dan kantor pusat pengelolaan infrastruktur permukiman dan tata kelola air Sulawesi Tengah.",
+      modelUrl: getPublicStorageUrl("ar-models", "cikasda.glb"),
       scale: "0.2 0.2 0.2",
       cards: [
         {
@@ -284,7 +285,7 @@ export const arModels: Record<Language, ARModelData[]> = {
       category: "Building & Religious Infrastructure",
       description:
         "The largest Islamic place of worship in Central Sulawesi featuring modern earthquake-resistant architecture.",
-      modelUrl: "/models/mosque.glb",
+      modelUrl: getPublicStorageUrl("ar-models", "mosque.glb"),
       scale: "0.1 0.1 0.1",
       cards: [
         {
@@ -319,7 +320,7 @@ export const arModels: Record<Language, ARModelData[]> = {
       category: "Water Resources Infrastructure",
       description:
         "Strategic water storage and management infrastructure to support regional agricultural irrigation.",
-      modelUrl: "/models/bendungan.glb",
+      modelUrl: getPublicStorageUrl("ar-models", "bendungan.glb"),
       scale: "0.05 0.05 0.05",
       cards: [
         {
@@ -350,11 +351,11 @@ export const arModels: Record<Language, ARModelData[]> = {
     },
     {
       id: 2,
-      title: "Regional Water Supply System",
+      title: "Regional Water Supply & CIKASDA Office",
       category: "Human Settlements & Water Supply",
       description:
-        "Integrated Water Supply Provision System to guarantee clean water availability for residential areas.",
-      modelUrl: "/models/cikasda.glb",
+        "Integrated Water Supply Provision System and headquarters for regional infrastructure management in Central Sulawesi.",
+      modelUrl: getPublicStorageUrl("ar-models", "cikasda.glb"),
       scale: "0.2 0.2 0.2",
       cards: [
         {
@@ -386,8 +387,6 @@ export const arModels: Record<Language, ARModelData[]> = {
   ],
 };
 
-import { createClient } from "../lib/supabase/client";
-
 interface LanguageContextType {
   language: Language;
   setLanguage: (language: Language) => void;
@@ -400,10 +399,13 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined,
 );
 
+const DEFAULT_MINDAR_TARGET_URL =
+  getPublicStorageUrl("ar-markers", "targets.mind");
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("id");
   const [dynamicModels, setDynamicModels] = useState<Record<Language, ARModelData[]>>(arModels);
-  const [mindarTargetUrl, setMindarTargetUrl] = useState<string>("/markers/targets.mind");
+  const [mindarTargetUrl, setMindarTargetUrl] = useState<string>(DEFAULT_MINDAR_TARGET_URL);
 
   useEffect(() => {
     const supabase = createClient();

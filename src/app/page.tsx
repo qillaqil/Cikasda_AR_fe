@@ -105,7 +105,7 @@ function HomeContent() {
         </header>
 
         <div className="relative min-h-0 flex-1 overflow-y-auto scroll-smooth snap-y snap-mandatory">
-          <section className="relative h-full snap-start overflow-hidden bg-black">
+          <section className="relative h-full snap-start overflow-hidden bg-transparent">
             <ARViewer
               activeTargetIndex={activeTargetIndex}
               setActiveTargetIndex={setActiveTargetIndex}
