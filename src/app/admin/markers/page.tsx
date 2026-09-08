@@ -106,8 +106,8 @@ export default function MindARMarkersPage() {
           const { data: files } = await supabase.storage.from("ar-markers").list();
           if (files) {
             const oldFiles = files
-              .filter((file) => file.name !== bundleFileName)
-              .map((file) => file.name);
+              .filter((file: { name: string }) => file.name !== bundleFileName)
+              .map((file: { name: string }) => file.name);
 
             if (oldFiles.length > 0) {
               await supabase.storage.from("ar-markers").remove(oldFiles);

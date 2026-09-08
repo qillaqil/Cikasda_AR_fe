@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AdminLayout({
@@ -23,39 +24,79 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const isLoginPage = pathname === "/admin/login";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(!isLoginPage);
   const supabase = createClient();
 
-  const isLoginPage = pathname === "/admin/login";
-
   useEffect(() => {
+    let isMounted = true;
 
-    async function checkUser() {
+    async function verifyAuth() {
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
+
+        if (!isMounted) return;
+
         if (session?.user) {
           setUserEmail(session.user.email ?? "Admin CIKASDA");
-        } else if (!isLoginPage) {
-          router.push("/admin/login");
+          setCheckingAuth(false);
+          if (isLoginPage) {
+            router.replace("/admin/dashboard");
+          }
+        } else {
+          setUserEmail(null);
+          setCheckingAuth(false);
+          if (!isLoginPage) {
+            router.replace("/admin/login");
+          }
         }
       } catch (err) {
         console.error("Auth check error:", err);
-        if (!isLoginPage) {
-          router.push("/admin/login");
+        if (isMounted) {
+          setCheckingAuth(false);
+          if (!isLoginPage) {
+            router.replace("/admin/login");
+          }
         }
       }
     }
 
-    checkUser();
-  }, [pathname, isLoginPage, router, supabase]);
+    verifyAuth();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event: AuthChangeEvent, session: Session | null) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        setUserEmail(session.user.email ?? "Admin CIKASDA");
+        setCheckingAuth(false);
+        if (isLoginPage) {
+          router.replace("/admin/dashboard");
+        }
+      } else {
+        setUserEmail(null);
+        setCheckingAuth(false);
+        if (!isLoginPage) {
+          router.replace("/admin/login");
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [pathname, isLoginPage, router]);
 
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      router.push("/admin/login");
+      router.replace("/admin/login");
     } catch (err) {
       console.error("Logout error:", err);
     }
@@ -63,6 +104,17 @@ export default function AdminLayout({
 
   if (isLoginPage) {
     return <>{children}</>;
+  }
+
+  if (checkingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-600">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-teal-600 border-t-transparent" />
+          <p className="text-xs font-semibold text-slate-500">Memverifikasi sesi admin...</p>
+        </div>
+      </div>
+    );
   }
 
   const navigation = [

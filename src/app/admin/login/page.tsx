@@ -68,16 +68,38 @@ export default function AdminLoginPage() {
     setLoading(true);
     setErrorMsg("");
 
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !password) {
-      setErrorMsg("Email dan kata sandi wajib diisi.");
+    const cleanInput = email.trim().toLowerCase();
+    if (!cleanInput || !password) {
+      setErrorMsg("Email / username dan kata sandi wajib diisi.");
       setLoading(false);
       return;
     }
 
+    // Normalisasi input username ke email Supabase yang sah
+    let targetEmail = cleanInput;
+    if (!targetEmail.includes("@")) {
+      if (
+        targetEmail === "admin" ||
+        targetEmail === "admincikasda" ||
+        targetEmail === "admincikasdaar" ||
+        targetEmail === "cikasda"
+      ) {
+        targetEmail = "admincikasdaar@cikasda.go.id";
+      } else if (targetEmail === "fadil" || targetEmail === "ppid") {
+        targetEmail = "fadil@ppid.com";
+      } else {
+        targetEmail = `${targetEmail}@cikasda.go.id`;
+      }
+    } else if (
+      targetEmail === "admin@cikasda.sultengprov.go.id" ||
+      targetEmail === "admin@cikasda.go.id"
+    ) {
+      targetEmail = "admincikasdaar@cikasda.go.id";
+    }
+
     try {
       const { error } = await supabase.auth.signInWithPassword({
-        email: cleanEmail,
+        email: targetEmail,
         password,
       });
 
@@ -109,7 +131,7 @@ export default function AdminLoginPage() {
           sessionStorage.removeItem("cikasda_login_lockout_until");
           sessionStorage.removeItem("cikasda_login_failed_attempts");
         } catch {}
-        router.push("/admin/dashboard");
+        router.replace("/admin/dashboard");
       }
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan pada sistem autentikasi.");
@@ -148,7 +170,7 @@ export default function AdminLoginPage() {
           {lockoutCountdown > 0 ? (
             <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
               <ShieldAlert className="h-4 w-4 shrink-0 text-amber-700 mt-0.5" />
-              <div>
+              <div className="flex-1">
                 <p className="font-bold text-amber-950">
                   Portal Terkunci Sementara ({lockoutCountdown} detik)
                 </p>
@@ -167,18 +189,18 @@ export default function AdminLoginPage() {
           <form onSubmit={handleLogin} className="mt-6 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email Pengelola
+                Email / Username Pengelola
               </label>
               <div className="relative flex items-center">
                 <Mail className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
                 <input
-                  type="email"
+                  type="text"
                   required
                   maxLength={100}
                   disabled={loading || lockoutCountdown > 0}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@cikasda.sultengprov.go.id"
+                  placeholder="Masukkan email atau username"
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
