@@ -5,11 +5,13 @@ import { CheckCircle2, FileUp, Loader2, UploadCloud, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface GLBUploaderProps {
+  projectId?: string | null;
   currentModelUrl: string;
   onModelUploaded: (url: string) => void;
 }
 
 export default function GLBUploader({
+  projectId,
   currentModelUrl,
   onModelUploaded,
 }: GLBUploaderProps) {
@@ -67,6 +69,16 @@ export default function GLBUploader({
         .getPublicUrl(data.path);
 
       if (publicData?.publicUrl) {
+        // Update database hanya jika projectId tersedia
+        if (projectId) {
+          const { error: updateError } = await supabase
+            .from("ar_projects")
+            .update({ model_url: publicData.publicUrl })
+            .eq("id", projectId);
+
+          if (updateError) throw updateError;
+        }
+
         onModelUploaded(publicData.publicUrl);
         setProgress(100);
       }

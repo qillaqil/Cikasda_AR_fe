@@ -80,7 +80,6 @@ function HomeContent() {
     <main className="h-[100svh] overflow-hidden bg-[#02090C] text-[#F4FFFF]">
       <div className="flex h-full flex-col">
         <header className="relative z-30 flex shrink-0 items-center justify-between gap-3 overflow-hidden border-b border-[#DCE8EA] bg-[#FFFFFF] px-3 py-3 shadow-[0_5px_18px_rgba(28,75,88,0.10)] sm:px-6 lg:px-8">
-          <div className="pointer-events-none absolute -left-5 -top-8 h-20 w-36 rounded-br-[42px] rounded-tr-[38px] bg-[#35B7B1] opacity-90" />
           <div className="pointer-events-none absolute -right-20 -top-12 h-28 w-56 rounded-[45%] bg-[#DDF5F3] opacity-80" />
           <div className="pointer-events-none absolute left-[46%] top-0 h-16 w-32 opacity-50 [background-image:radial-gradient(#B9D8D9_1px,transparent_1px)] [background-size:7px_7px]" />
 

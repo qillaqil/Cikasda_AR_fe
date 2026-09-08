@@ -471,66 +471,62 @@ export default function ARViewer({
         muted
         playsInline
       />
-      {scriptsReady ? (
-        <>
-          <a-scene
-            ref={sceneRef}
-            mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
-            color-space="sRGB"
-            renderer="colorManagement: true; alpha: true; antialias: true"
-            vr-mode-ui="enabled: false"
-            device-orientation-permission-ui="enabled: false"
-            embedded
-            gesture-detector=""
-            class="absolute inset-0 z-10 block h-full w-full"
-            style={{ height: "100%", width: "100%", background: "transparent" }}
-          >
-            {/* DAFTARKAN ASSET MODEL SECARA DINAMIS */}
-            <a-assets timeout="10000">
-              {models.map((item) => (
-                <a-asset-item
-                  key={`asset-${item.id}`}
-                  id={`model-${item.id}`}
-                  src={item.modelUrl}
-                ></a-asset-item>
-              ))}
-            </a-assets>
+      {scriptsReady && models.length > 0 && activeTargetUrl.startsWith("http") ? (
+        <a-scene
+          ref={sceneRef}
+          mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
+          color-space="sRGB"
+          renderer="colorManagement: true; alpha: true; antialias: true"
+          vr-mode-ui="enabled: false"
+          device-orientation-permission-ui="enabled: false"
+          embedded
+          gesture-detector=""
+          class="absolute inset-0 z-10 block h-full w-full"
+          style={{ height: "100%", width: "100%", background: "transparent" }}
+        >
+          <a-assets timeout="10000">
+            {models.map((item) => (
+              <a-asset-item
+                key={`asset-${item.id}`}
+                id={`model-${item.id}`}
+                src={item.modelUrl}
+              ></a-asset-item>
+            ))}
+          </a-assets>
 
-            <a-camera
-              position="0 0 0"
-              look-controls="enabled: false"
-            ></a-camera>
+          <a-camera
+            position="0 0 0"
+            look-controls="enabled: false"
+          ></a-camera>
 
-            {/* DAFTARKAN TARGET MARKER DAN MODEL 3D */}
-            {models.map((item, index) => (
+          {models.map((item, index) => (
+            <a-entity
+              key={`target-${item.id}`}
+              mindar-image-target={`targetIndex: ${index}`}
+              marker-listener=""
+            >
+              <a-entity light="type: ambient; intensity: 1.2"></a-entity>
               <a-entity
-                key={`target-${item.id}`}
-                mindar-image-target={`targetIndex: ${index}`}
-                marker-listener=""
-              >
-                <a-entity light="type: ambient; intensity: 1.2"></a-entity>
-                <a-entity
-                  light="type: directional; intensity: 0.8"
-                  position="0 1 1"
-                ></a-entity>
+                light="type: directional; intensity: 0.8"
+                position="0 1 1"
+              ></a-entity>
+              {item.modelUrl && item.modelUrl.startsWith("http") && (
                 <a-gltf-model
                   src={`#model-${item.id}`}
                   position="0 0 0"
-                  scale={item.scale}
+                  scale={item.scale || "0.1 0.1 0.1"}
                   rotation="0 0 0"
                   gesture-handler=""
                 ></a-gltf-model>
-              </a-entity>
-            ))}
-          </a-scene>
-
-          <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
-            <div className="rounded-full bg-black/55 px-4 py-2 text-center text-xs text-white/85">
-              {t.rotateGesture} · {t.zoomGesture}
-            </div>
-          </div>
-        </>
-      ) : null}
+              )}
+            </a-entity>
+          ))}
+        </a-scene>
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-white">
+          Loading AR Resources...
+        </div>
+      )}
     </section>
   );
 }

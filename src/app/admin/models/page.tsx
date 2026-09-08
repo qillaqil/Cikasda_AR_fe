@@ -152,6 +152,7 @@ export default function AdminModelsPage() {
             </div>
 
             <GLBUploader
+              projectId={projects.find(p => p.model_url === selectedModelUrl)?.id || ""}
               currentModelUrl={selectedModelUrl}
               onModelUploaded={(url) => {
                 setSelectedModelUrl(url);

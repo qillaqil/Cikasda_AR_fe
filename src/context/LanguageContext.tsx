@@ -416,6 +416,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
           .order("target_index", { ascending: true });
 
         if (!error && data && data.length > 0) {
+          console.log("Fetched Data from Supabase:", data); // Debugging
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const idModels: ARModelData[] = data.map((item: any) => ({
             id: item.target_index,

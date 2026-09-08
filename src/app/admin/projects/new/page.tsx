@@ -496,6 +496,7 @@ export default function NewProjectPage() {
               File Model (.glb)
             </label>
             <GLBUploader
+              projectId={null}
               currentModelUrl={modelUrl}
               onModelUploaded={(url) => setModelUrl(url)}
             />

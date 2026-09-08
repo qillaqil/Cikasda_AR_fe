@@ -102,6 +102,18 @@ export default function MindARMarkersPage() {
           });
 
         if (!error && data) {
+          // Hapus file marker lama (kecuali file yang baru saja di-upload)
+          const { data: files } = await supabase.storage.from("ar-markers").list();
+          if (files) {
+            const oldFiles = files
+              .filter((file) => file.name !== bundleFileName)
+              .map((file) => file.name);
+
+            if (oldFiles.length > 0) {
+              await supabase.storage.from("ar-markers").remove(oldFiles);
+            }
+          }
+
           const { data: publicData } = supabase.storage
             .from("ar-markers")
             .getPublicUrl(data.path);
