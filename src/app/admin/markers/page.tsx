@@ -12,6 +12,7 @@ import {
   Plus,
   RotateCcw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { useProjects } from "@/lib/hooks/useProjects";
 
@@ -37,7 +38,6 @@ export default function MindARMarkersPage() {
   const [progress, setProgress] = useState(0);
   const [compilerReady, setCompilerReady] = useState(false);
   const [bundleUrl, setBundleUrl] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -58,14 +58,14 @@ export default function MindARMarkersPage() {
   }, []);
 
   const handleCompileMarkers = async () => {
-    if (!window.MINDAR?.IMAGE?.Compiler) {
-      alert("Compiler MindAR sedang dimuat, silakan coba beberapa saat lagi...");
+    if (!compilerReady || !window.MINDAR?.IMAGE?.Compiler) {
+      toast.warning("Compiler MindAR sedang diunduh di browser, silakan tunggu beberapa detik...");
       return;
     }
 
     setCompiling(true);
     setProgress(0);
-    setSuccessMsg("");
+    toast.info(`Memulai kompilasi ${projects.length} gambar marker target...`);
 
     try {
       const compiler = new window.MINDAR.IMAGE.Compiler();
@@ -102,7 +102,7 @@ export default function MindARMarkersPage() {
           });
 
         if (!error && data) {
-          // Hapus file marker lama (kecuali file yang baru saja di-upload)
+          // Hapus file marker lama jika ada
           const { data: files } = await supabase.storage.from("ar-markers").list();
           if (files) {
             const oldFiles = files
@@ -129,46 +129,56 @@ export default function MindARMarkersPage() {
         }
       }
 
-      setSuccessMsg(`Berhasil mengompilasi ${projects.length} marker target ke file targets.mind!`);
+      toast.success(`Berhasil mengompilasi ${projects.length} target ke file targets.mind!`);
       mutateProjects();
     } catch (err: unknown) {
       console.error("Compilation error:", err);
-      alert("Terjadi kendala saat kompilasi marker: " + (err instanceof Error ? err.message : "Gagal memproses file gambar"));
+      toast.error(
+        "Terjadi kendala saat kompilasi marker: " +
+          (err instanceof Error ? err.message : "Gagal memproses file gambar")
+      );
     } finally {
       setCompiling(false);
     }
   };
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-6 w-full pb-12 font-sans">
       {/* Header */}
       <div>
-        <h2 className="text-xl font-bold text-slate-900 sm:text-2xl">
+        <h2 className="text-2xl font-bold tracking-tight text-[#0b3558] sm:text-3xl">
           MindAR Marker Studio & Compiler
         </h2>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs sm:text-sm text-[#476788] mt-1">
           Kompilasi kumpulan gambar target marker menjadi satu file binary targets.mind secara langsung di browser
         </p>
       </div>
 
-      {/* Compiler Action Card */}
-      <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center border-b border-slate-100 pb-4">
+      {/* Compiler Action Card with Calendly styling */}
+      <div className="relative overflow-hidden rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgba(71,103,136,0.06)] space-y-4">
+        {/* Soft Decorative Accent Blob */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-[#006bff]/5 blur-2xl" />
+
+        <div className="relative z-10 flex flex-col justify-between gap-4 md:flex-row md:items-center border-b border-[#d4e0ed]/80 pb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
+            <div className="inline-flex items-center gap-2 rounded-full bg-[#e6f0ff] px-3 py-1 text-[11px] font-bold text-[#004eba] border border-[#d4e0ed] mb-2">
+              <Cpu className="h-3.5 w-3.5 text-[#006bff]" />
+              In-Browser Feature Point Extraction
+            </div>
+            <h3 className="text-lg font-bold text-[#0b3558] tracking-tight">
               Kompilasi Seluruh Marker Aktif ({projects.length} Target)
             </h3>
-            <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
-              Kompilasi seluruh gambar target aktif menjadi satu file binary targets.mind untuk pelacakan kamera AR pengunjung.
+            <p className="mt-1 text-xs text-[#476788] max-w-2xl leading-relaxed">
+              Ekstraksi feature points seluruh gambar target aktif menjadi satu file binary targets.mind untuk pelacakan kamera AR pengunjung.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0 pt-2 md:pt-0">
             <button
               type="button"
               onClick={handleCompileMarkers}
               disabled={compiling || projects.length === 0}
-              className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-teal-800 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-[#006bff] hover:bg-[#0058d6] px-4 py-2.5 text-xs font-semibold text-white shadow-[0_4px_12px_rgba(0,107,255,0.25)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {compiling ? (
                 <>
@@ -187,9 +197,9 @@ export default function MindARMarkersPage() {
               <a
                 href={bundleUrl}
                 download="targets.mind"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#d4e0ed] bg-white hover:bg-[#f0f3f8] px-3.5 py-2.5 text-xs font-semibold text-[#0b3558] shadow-xs transition-all"
               >
-                <Download className="h-3.5 w-3.5 text-teal-700" />
+                <Download className="h-3.5 w-3.5 text-[#006bff]" />
                 Unduh targets.mind
               </a>
             )}
@@ -197,63 +207,60 @@ export default function MindARMarkersPage() {
         </div>
 
         {compiling && (
-          <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-xs font-semibold text-slate-600">
-              <span>Mengekstrak Feature Points...</span>
-              <span className="font-mono">{progress}%</span>
+          <div className="relative z-10 space-y-2 pt-2">
+            <div className="flex justify-between text-xs font-semibold text-[#0b3558]">
+              <span>Mengekstrak Feature Points MindAR...</span>
+              <span className="font-mono text-[#006bff]">{progress}%</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#f0f3f8] border border-[#d4e0ed]">
               <div
-                className="h-full bg-teal-600 transition-all duration-300"
+                className="h-full bg-[#006bff] transition-all duration-300 rounded-full shadow-xs"
                 style={{ width: `${progress}%` }}
               />
             </div>
           </div>
         )}
-
-        {successMsg && (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        )}
       </div>
 
       {/* Target Marker List */}
-      <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+      <div className="w-full rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_16px_rgba(71,103,136,0.04)] space-y-4">
+        <div className="flex items-center justify-between border-b border-[#d4e0ed]/80 pb-3">
           <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-teal-700" />
-            <h3 className="text-sm font-bold text-slate-900">
+            <Layers className="h-4 w-4 text-[#006bff]" />
+            <h3 className="text-sm font-bold text-[#0b3558]">
               Daftar Marker Berdasarkan Urutan Indeks Kamera
             </h3>
           </div>
           <button
             type="button"
-            onClick={() => mutateProjects()}
-            className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
+            onClick={() => {
+              mutateProjects();
+              toast.info("Memperbarui daftar marker...");
+            }}
+            className="inline-flex items-center gap-1 text-xs font-medium text-[#476788] hover:text-[#0b3558] transition-colors"
           >
-            <RotateCcw className="h-3 w-3" />
+            <RotateCcw className="h-3.5 w-3.5" />
             Segarkan
           </button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {projects.map((proj) => (
             <div
               key={proj.id}
-              className="rounded-lg border border-slate-200 bg-slate-50/50 p-3.5 space-y-3 hover:border-slate-300 transition-colors"
+              className="rounded-2xl border border-[#d4e0ed] bg-[#f8f9fb] p-4 space-y-3 hover:border-[#006bff]/50 hover:bg-white transition-all shadow-[0_2px_8px_rgba(71,103,136,0.04)]"
             >
               <div className="flex items-center justify-between">
-                <span className="inline-flex h-6 px-2 items-center justify-center rounded bg-slate-100 font-mono text-xs font-bold text-slate-700 border border-slate-200">
-                  Target Index #{proj.target_index}
+                <span className="inline-flex h-6 px-2.5 items-center justify-center rounded-full bg-[#e6f0ff] font-mono text-xs font-bold text-[#004eba] border border-[#d4e0ed]">
+                  Index #{proj.target_index}
                 </span>
-                <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#059669] bg-[#ecfdf5] border border-[#a7f3d0] rounded-full px-2 py-0.5">
+                  <CheckCircle2 className="h-3 w-3" />
                   Siap Lacak
                 </span>
               </div>
 
-              <div className="relative h-44 w-full overflow-hidden rounded-md border border-slate-200 bg-white flex items-center justify-center">
+              <div className="relative h-44 w-full overflow-hidden rounded-xl border border-[#d4e0ed] bg-white flex items-center justify-center shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={proj.marker_image_url || "/contohAR.png"}
@@ -263,10 +270,10 @@ export default function MindARMarkersPage() {
               </div>
 
               <div>
-                <h4 className="font-bold text-xs text-slate-900 truncate">
+                <h4 className="font-bold text-xs text-[#0b3558] truncate">
                   {proj.title_id}
                 </h4>
-                <p className="text-[11px] text-slate-500 truncate">
+                <p className="text-[11px] text-[#476788] truncate mt-0.5">
                   Model: {proj.model_url.split("/").pop()}
                 </p>
               </div>
@@ -276,15 +283,15 @@ export default function MindARMarkersPage() {
           {/* Add New Target Slot Card */}
           <Link
             href="/admin/projects/new"
-            className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50/50 p-6 text-center hover:border-teal-400 hover:bg-teal-50/30 transition-all min-h-[280px] group"
+            className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#d4e0ed] bg-[#f8f9fb] hover:border-[#006bff] hover:bg-[#e6f0ff]/30 p-6 text-center transition-all min-h-[280px] group"
           >
-            <div className="rounded-full bg-white p-3 shadow-xs border border-slate-200 group-hover:border-teal-300 group-hover:scale-105 transition-all">
-              <Plus className="h-5 w-5 text-slate-400 group-hover:text-teal-700" />
+            <div className="rounded-full bg-white p-3.5 shadow-xs border border-[#d4e0ed] group-hover:border-[#006bff] group-hover:scale-105 transition-all">
+              <Plus className="h-5 w-5 text-[#a6bbd1] group-hover:text-[#006bff]" />
             </div>
-            <p className="mt-3 text-xs font-bold text-slate-700 group-hover:text-teal-900">
+            <p className="mt-3 text-xs font-bold text-[#0b3558] group-hover:text-[#006bff]">
               Tambah Target #{projects.length}
             </p>
-            <p className="mt-1 text-[11px] text-slate-400 max-w-[180px]">
+            <p className="mt-1 text-[11px] text-[#476788] max-w-[180px]">
               Daftarkan objek AR baru untuk index tracking kamera berikutnya
             </p>
           </Link>

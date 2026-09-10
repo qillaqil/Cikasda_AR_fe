@@ -1,7 +1,7 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
-import { createClient, getPublicStorageUrl } from "../lib/supabase/client";
+import { createContext, ReactNode, useContext, useMemo, useState } from "react";
+import { useProjects, useMindARBundle } from "@/lib/hooks/useProjects";
 
 export type Language = "id" | "en";
 
@@ -170,223 +170,6 @@ export const translations: Record<Language, Record<TranslationKey, string>> = {
   },
 };
 
-export const arModels: Record<Language, ARModelData[]> = {
-  id: [
-    {
-      id: 0,
-      title: "Masjid Raya Baitul Khairaat",
-      category: "Bangunan Gedung & Religi",
-      description:
-        "Tempat ibadah umat Islam terbesar di Sulawesi Tengah berkonsep modern-kontemporer tahan gempa.",
-      modelUrl: getPublicStorageUrl("ar-models", "mosque.glb"),
-      scale: "0.1 0.1 0.1",
-      cards: [
-        {
-          label: "Bangunan Utama",
-          value: "Masjid Raya Baitul Khairaat",
-          detail:
-            "Masjid Raya Baitul Khairaat (dahulu kawasan Masjid Agung Darussalam) merupakan tempat ibadah umat Islam terbesar di Sulawesi Tengah di atas lahan 4 hektare. Desain modern-kontemporer dengan simbolisme numerik Al-Qur'an (tinggi 30m melambangkan 30 juz) dan struktur tahan gempa SNI didukung 483 tiang pancang.",
-        },
-        {
-          label: "Fungsi & Ibadah",
-          value: "Fungsi Sosial & Ibadah",
-          detail:
-            "Fungsi Ibadah: Sarana utama salat fardu berjemaah, salat Jumat, Id, iktikaf, dan pengajian rutin berkapasitas 10.000 - 15.000 jemaah.\n\nFungsi Sosial: Pusat pemberdayaan umat, pengelolaan ZIS, serta ruang silaturahmi warga (Hablum minannas).",
-        },
-        {
-          label: "Tahun Peresmian",
-          value: "2025 (4 Desember)",
-          detail:
-            "Tahun Pendataan & Peresmian: 2025. Diresmikan pada 4 Desember 2025 setelah proses pembangunan kembali pascabencana gempa bumi guna memenuhi standar struktur tahan gempa.",
-        },
-        {
-          label: "Kawasan & Lokasi",
-          value: "Palu, Sulawesi Tengah",
-          detail:
-            "Alamat: Jl. Jaelangkara / Jl. WR Supratman, Kelurahan Baru, Kecamatan Palu Barat, Kota Palu, Sulawesi Tengah.\n\nKoordinat Peta: Berada strategis di pusat kota Palu, tidak jauh dari pesisir Teluk Palu.",
-        },
-      ],
-    },
-    {
-      id: 1,
-      title: "Bendungan Irigasi CIKASDA",
-      category: "Sumber Daya Air (SDA)",
-      description:
-        "Infrastruktur penampungan dan pengelolaan air strategis untuk mendukung irigasi pertanian daerah.",
-      modelUrl: getPublicStorageUrl("ar-models", "bendungan.glb"),
-      scale: "0.05 0.05 0.05",
-      cards: [
-        {
-          label: "Tipe Struktur",
-          value: "Urugan Batu Inti Kedap",
-          detail:
-            "Bendungan berstruktur urugan batu dengan inti kedap air. Didesain menahan debit air berskala besar, dilengkapi pintu pelimpah (spillway) serta sistem monitoring tekanan air otomatis.",
-        },
-        {
-          label: "Kapasitas Tampung",
-          value: "15 Juta m³ Air",
-          detail:
-            "Memiliki kapasitas tampungan efektif hingga 15 Juta m³ air untuk menjaga ketersediaan pasokan air baku dan mengendalikan risiko banjir di wilayah hilir saat curah hujan tinggi.",
-        },
-        {
-          label: "Tinggi Elevasi",
-          value: "45 Meter",
-          detail:
-            "Struktur bendungan berdiri setinggi 45 meter dari dasar pondasi untuk memastikan stabilitas tekanan air dan distribusi aliran irigasi yang optimal.",
-        },
-        {
-          label: "Cakupan Irigasi",
-          value: "1.500 Hektar Sawah",
-          detail:
-            "Mengalirkan air secara konsisten ke jaringan irigasi primer dan sekunder untuk mengairi lebih dari 1.500 hektar lahan pertanian di Sulawesi Tengah.",
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "Gedung Dinas Cipta Karya & Sumber Daya Air",
-      category: "Cipta Karya & Air Minum",
-      description:
-        "Sistem Penyediaan Air Minum terpadu dan kantor pusat pengelolaan infrastruktur permukiman dan tata kelola air Sulawesi Tengah.",
-      modelUrl: getPublicStorageUrl("ar-models", "cikasda.glb"),
-      scale: "0.2 0.2 0.2",
-      cards: [
-        {
-          label: "Kapasitas Debit",
-          value: "300 Liter / Detik",
-          detail:
-            "Infrastruktur pengolahan air minum modern ini menyalurkan air bersih steril dengan debit kapasitas mencapai 300 liter per detik.",
-        },
-        {
-          label: "Panjang Jaringan",
-          value: "18.5 Kilometer",
-          detail:
-            "Konstruksi pipa transmisi bertekanan tinggi membentang sepanjang 18.5 kilometer menggunakan material HDPE standar industri yang tahan korosi dan guncangan tanah.",
-        },
-        {
-          label: "Target Layanan",
-          value: "25.000 Sambungan (SR)",
-          detail:
-            "Dirancang untuk memberikan akses air bersih layak minum secara langsung kepada lebih dari 25.000 Sambungan Rumah (SR) pemukiman warga.",
-        },
-        {
-          label: "Tahun Pembangunan",
-          value: "2025 - 2026",
-          detail:
-            "Masuk dalam program prioritas pemerintah daerah untuk memperluas pencapaian sanitasi dan air bersih berkualitas di Sulawesi Tengah.",
-        },
-      ],
-    },
-  ],
-  en: [
-    {
-      id: 0,
-      title: "Baitul Khairaat Grand Mosque",
-      category: "Building & Religious Infrastructure",
-      description:
-        "The largest Islamic place of worship in Central Sulawesi featuring modern earthquake-resistant architecture.",
-      modelUrl: getPublicStorageUrl("ar-models", "mosque.glb"),
-      scale: "0.1 0.1 0.1",
-      cards: [
-        {
-          label: "Main Building",
-          value: "Baitul Khairaat Grand Mosque",
-          detail:
-            "Baitul Khairaat Grand Mosque is the largest Islamic place of worship in Central Sulawesi standing on 4 hectares. Features modern-contemporary design rich in Qur'anic symbolism (30m height symbolizing 30 juz) and earthquake-resistant structures.",
-        },
-        {
-          label: "Functions & Worship",
-          value: "Social & Worship Functions",
-          detail:
-            "Worship Function: Main facility for congregational prayers and gatherings with a capacity of 10,000 - 15,000 worshippers.\n\nSocial Function: Community empowerment center, ZIS management, and public gathering space.",
-        },
-        {
-          label: "Inauguration Year",
-          value: "2025 (December 4)",
-          detail:
-            "Inaugurated on December 4, 2025 after reconstruction following post-earthquake recovery programs to meet national earthquake-resistant building standards.",
-        },
-        {
-          label: "Area & Location",
-          value: "Palu, Central Sulawesi",
-          detail:
-            "Address: Jl. Jaelangkara / Jl. WR Supratman, West Palu, Palu City, Central Sulawesi.\n\nStrategically located near the Palu Bay coastline.",
-        },
-      ],
-    },
-    {
-      id: 1,
-      title: "CIKASDA Irrigation Dam",
-      category: "Water Resources Infrastructure",
-      description:
-        "Strategic water storage and management infrastructure to support regional agricultural irrigation.",
-      modelUrl: getPublicStorageUrl("ar-models", "bendungan.glb"),
-      scale: "0.05 0.05 0.05",
-      cards: [
-        {
-          label: "Structure Type",
-          value: "Rock-fill Core Dam",
-          detail:
-            "A rock-fill dam structure with an impervious clay core. Equipped with spillway gates and automated water pressure monitoring systems.",
-        },
-        {
-          label: "Storage Capacity",
-          value: "15 Million m³ Water",
-          detail:
-            "Holds an effective storage capacity of up to 15 Million m³ of water reserves to control regional flood risks during high rainfall seasons.",
-        },
-        {
-          label: "Elevation Height",
-          value: "45 Meters",
-          detail:
-            "Standing 45 meters high from foundation levels to ensure structural stability and optimal irrigation flow pressure.",
-        },
-        {
-          label: "Irrigation Coverage",
-          value: "1,500 Hectares Farmland",
-          detail:
-            "Consistently delivers water through primary and secondary irrigation networks to over 1,500 hectares of agricultural land.",
-        },
-      ],
-    },
-    {
-      id: 2,
-      title: "Regional Water Supply & CIKASDA Office",
-      category: "Human Settlements & Water Supply",
-      description:
-        "Integrated Water Supply Provision System and headquarters for regional infrastructure management in Central Sulawesi.",
-      modelUrl: getPublicStorageUrl("ar-models", "cikasda.glb"),
-      scale: "0.2 0.2 0.2",
-      cards: [
-        {
-          label: "Flow Rate Capacity",
-          value: "300 Liters / Second",
-          detail:
-            "Modern water treatment plant system delivering clean potable water at flow rates reaching 300 Liters per Second.",
-        },
-        {
-          label: "Network Length",
-          value: "18.5 Kilometers",
-          detail:
-            "High-pressure pipeline network spanning 18.5 kilometers constructed with industrial HDPE corrosion-resistant materials.",
-        },
-        {
-          label: "Service Target",
-          value: "25,000 House Connections",
-          detail:
-            "Designed to supply direct potable water connections to over 25,000 residential households.",
-        },
-        {
-          label: "Construction Year",
-          value: "2025 - 2026",
-          detail:
-            "Part of priority public works programs expanding regional clean water coverage in Central Sulawesi.",
-        },
-      ],
-    },
-  ],
-};
-
 interface LanguageContextType {
   language: Language;
   setLanguage: (language: Language) => void;
@@ -399,87 +182,28 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
   undefined,
 );
 
-const DEFAULT_MINDAR_TARGET_URL =
-  getPublicStorageUrl("ar-markers", "targets.mind");
-
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("id");
-  const [dynamicModels, setDynamicModels] = useState<Record<Language, ARModelData[]>>(arModels);
-  const [mindarTargetUrl, setMindarTargetUrl] = useState<string>(DEFAULT_MINDAR_TARGET_URL);
+  const { activeProjects } = useProjects();
+  const { bundleUrl } = useMindARBundle();
 
-  useEffect(() => {
-    const supabase = createClient();
-    async function loadData() {
-      try {
-        const { data, error } = await supabase
-          .from("ar_projects")
-          .select("*, cards:ar_project_cards(*)")
-          .eq("is_active", true)
-          .order("target_index", { ascending: true });
-
-        if (!error && data && data.length > 0) {
-          console.log("Fetched Data from Supabase:", data); // Debugging
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const idModels: ARModelData[] = data.map((item: any) => ({
-            id: item.target_index,
-            title: item.title_id,
-            category: item.category_id,
-            description: item.description_id,
-            modelUrl: item.model_url,
-            scale: item.model_scale || "0.1 0.1 0.1",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cards: (item.cards || [])
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .sort((a: any, b: any) => a.slot_index - b.slot_index)
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((c: any) => ({
-                label: c.label_id,
-                value: c.value_id,
-                detail: c.detail_id,
-              })),
-          }));
-
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const enModels: ARModelData[] = data.map((item: any) => ({
-            id: item.target_index,
-            title: item.title_en || item.title_id,
-            category: item.category_en || item.category_id,
-            description: item.description_en || item.description_id,
-            modelUrl: item.model_url,
-            scale: item.model_scale || "0.1 0.1 0.1",
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            cards: (item.cards || [])
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .sort((a: any, b: any) => a.slot_index - b.slot_index)
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((c: any) => ({
-                label: c.label_en || c.label_id,
-                value: c.value_en || c.value_id,
-                detail: c.detail_en || c.detail_id,
-              })),
-          }));
-
-          setDynamicModels({ id: idModels, en: enModels });
-        }
-
-        const { data: bundleData } = await supabase
-          .from("mindar_bundles")
-          .select("bundle_url")
-          .eq("is_active", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (bundleData?.bundle_url) {
-          setMindarTargetUrl(bundleData.bundle_url);
-        }
-      } catch {
-        // Fallback gracefully
-      }
-    }
-
-    loadData();
-  }, []);
+  const models = useMemo<ARModelData[]>(() => {
+    return (activeProjects || []).map((item) => ({
+      id: item.target_index,
+      title: language === "id" ? item.title_id : (item.title_en || item.title_id),
+      category: language === "id" ? item.category_id : (item.category_en || item.category_id),
+      description: language === "id" ? item.description_id : (item.description_en || item.description_id),
+      modelUrl: item.model_url,
+      scale: item.model_scale || "0.1 0.1 0.1",
+      cards: (item.cards || [])
+        .sort((a, b) => a.slot_index - b.slot_index)
+        .map((c) => ({
+          label: language === "id" ? c.label_id : (c.label_en || c.label_id),
+          value: language === "id" ? c.value_id : (c.value_en || c.value_id),
+          detail: language === "id" ? c.detail_id : (c.detail_en || c.detail_id),
+        })),
+    }));
+  }, [activeProjects, language]);
 
   return (
     <LanguageContext.Provider
@@ -487,8 +211,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         language,
         setLanguage,
         t: translations[language],
-        models: dynamicModels[language],
-        mindarTargetUrl,
+        models,
+        mindarTargetUrl: bundleUrl,
       }}
     >
       {children}

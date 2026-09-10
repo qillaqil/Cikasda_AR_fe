@@ -140,6 +140,15 @@ function registerGestureComponents() {
     throw new Error("A-Frame belum siap.");
   }
 
+  // Enable Three.js file caching for 3D GLB models and textures
+  // When a user scans a marker, the loaded 3D asset is cached in memory
+  // so scanning again or re-detecting the marker never re-downloads the file!
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((aframe as any).THREE && (aframe as any).THREE.Cache) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (aframe as any).THREE.Cache.enabled = true;
+  }
+
   if (!aframe.components["gesture-detector"]) {
     aframe.registerComponent("gesture-detector", {
       init() {

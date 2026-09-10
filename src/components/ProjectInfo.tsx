@@ -57,8 +57,8 @@ export default function ProjectInfo({ activeTargetIndex }: ProjectInfoProps) {
   const effectiveIndex = activeTargetIndex ?? lastScannedIndex;
 
   const activeModel =
-    effectiveIndex !== null && models[effectiveIndex]
-      ? models[effectiveIndex]
+    effectiveIndex !== null
+      ? models.find((m) => m.id === effectiveIndex) ?? models[effectiveIndex] ?? null
       : null;
 
   const displayName = activeModel ? activeModel.title : "-";

@@ -16,11 +16,11 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { createClient, getPublicStorageUrl } from "@/lib/supabase/client";
 import { useProjects } from "@/lib/hooks/useProjects";
 import GLBUploader from "@/components/admin/GLBUploader";
 import ModelViewer3D from "@/components/admin/ModelViewer3D";
-import { arModels } from "@/context/LanguageContext";
 
 export default function EditProjectPage() {
   const params = useParams();
@@ -32,7 +32,6 @@ export default function EditProjectPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [translating, setTranslating] = useState(false);
-  const [translateNotice, setTranslateNotice] = useState("");
   const [activeLangTab, setActiveLangTab] = useState<"id" | "en">("id");
 
   // Project Info
@@ -117,11 +116,11 @@ export default function EditProjectPage() {
           setTargetIndex(data.target_index);
           setSlug(data.slug);
           setTitleId(data.title_id);
-          setTitleEn(data.title_en);
+          setTitleEn(data.title_en || data.title_id);
           setCategoryId(data.category_id);
-          setCategoryEn(data.category_en);
+          setCategoryEn(data.category_en || data.category_id);
           setDescId(data.description_id);
-          setDescEn(data.description_en);
+          setDescEn(data.description_en || data.description_id);
           setModelUrl(data.model_url);
           setModelScale(data.model_scale || "0.1 0.1 0.1");
           setMarkerImageUrl(data.marker_image_url || "/contohAR.png");
@@ -135,43 +134,11 @@ export default function EditProjectPage() {
             );
           }
         } else {
-          // Fallback to local default index if numerical id
-          const numIdx = parseInt(projectId);
-          const localItem = arModels.id[isNaN(numIdx) ? 0 : numIdx] || arModels.id[0];
-          setTargetIndex(localItem.id);
-          setSlug(localItem.title.toLowerCase().replace(/\s+/g, "-"));
-          setTitleId(localItem.title);
-          setTitleEn(arModels.en[localItem.id]?.title || localItem.title);
-          setCategoryId(localItem.category);
-          setCategoryEn(arModels.en[localItem.id]?.category || localItem.category);
-          setDescId(localItem.description);
-          setDescEn(arModels.en[localItem.id]?.description || localItem.description);
-          setModelUrl(localItem.modelUrl);
-          setModelScale(localItem.scale);
-          setMarkerImageUrl("/contohAR.png");
-
-          setCards(
-            localItem.cards.map((c, idx) => ({
-              slot_index: idx,
-              icon_name:
-                idx === 0
-                  ? "Building2"
-                  : idx === 1
-                  ? "Users"
-                  : idx === 2
-                  ? "CalendarDays"
-                  : "MapPin",
-              label_id: c.label,
-              label_en: arModels.en[localItem.id]?.cards[idx]?.label || c.label,
-              value_id: c.value,
-              value_en: arModels.en[localItem.id]?.cards[idx]?.value || c.value,
-              detail_id: c.detail,
-              detail_en: arModels.en[localItem.id]?.cards[idx]?.detail || c.detail,
-            }))
-          );
+          toast.error("Proyek tidak ditemukan di database.");
+          router.push("/admin/projects");
         }
       } catch {
-        // Handled
+        toast.error("Gagal memuat detail proyek dari database.");
       } finally {
         setLoading(false);
       }
@@ -191,12 +158,12 @@ export default function EditProjectPage() {
   // AI Auto-Translation using Groq API
   const handleAITranslate = async () => {
     if (!titleId && !descId) {
-      alert("Silakan isi Nama Proyek atau Deskripsi dalam Bahasa Indonesia terlebih dahulu.");
+      toast.warning("Silakan isi minimal Nama Proyek dan Deskripsi dalam Bahasa Indonesia terlebih dahulu.");
       return;
     }
 
     setTranslating(true);
-    setTranslateNotice("");
+    toast.info("Sedang menerjemahkan konten dengan AI Llama 3.3...");
 
     try {
       const response = await fetch("/api/translate", {
@@ -236,10 +203,10 @@ export default function EditProjectPage() {
       }
 
       setActiveLangTab("en");
-      setTranslateNotice("Berhasil diterjemahkan oleh AI (Groq Llama 3.3)! Anda sedang melihat tab English.");
+      toast.success("Berhasil diperbarui oleh AI! Anda dialihkan ke tab English.");
     } catch (err: unknown) {
       console.error("Translation error:", err);
-      alert(err instanceof Error ? err.message : "Terjadi kesalahan saat memproses terjemahan AI.");
+      toast.error(err instanceof Error ? err.message : "Terjadi kesalahan saat memproses terjemahan AI.");
     } finally {
       setTranslating(false);
     }
@@ -250,11 +217,11 @@ export default function EditProjectPage() {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      alert("File marker harus berupa gambar (PNG, JPG, JPEG, WEBP).");
+      toast.error("File marker harus berupa gambar (PNG, JPG, JPEG, WEBP).");
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert("Ukuran file gambar marker maksimal 10MB.");
+      toast.error("Ukuran file gambar marker maksimal 10MB.");
       return;
     }
 
@@ -275,10 +242,12 @@ export default function EditProjectPage() {
             .getPublicUrl(data.path);
           if (publicData?.publicUrl) {
             setMarkerImageUrl(publicData.publicUrl);
+            toast.success("Gambar marker baru berhasil diunggah!");
           }
         }
       } catch (err) {
         console.error("Marker upload error:", err);
+        toast.error("Gagal mengunggah foto marker.");
       }
     }
   };
@@ -288,7 +257,7 @@ export default function EditProjectPage() {
     setSubmitting(true);
 
     try {
-      await supabase
+      const { error: projectError } = await supabase
         .from("ar_projects")
         .update({
           target_index: targetIndex,
@@ -296,15 +265,17 @@ export default function EditProjectPage() {
           category_id: categoryId,
           category_en: categoryEn,
           title_id: titleId,
-          title_en: titleEn,
+          title_en: titleEn || titleId,
           description_id: descId,
-          description_en: descEn,
+          description_en: descEn || descId,
           model_url: modelUrl,
           model_scale: modelScale,
           marker_image_url: markerImageUrl,
           updated_at: new Date().toISOString(),
         })
         .eq("id", projectId);
+
+      if (projectError) throw projectError;
 
       for (const card of cards) {
         await supabase
@@ -315,22 +286,26 @@ export default function EditProjectPage() {
               slot_index: card.slot_index,
               icon_name: card.icon_name,
               label_id: card.label_id,
-              label_en: card.label_en,
-              value_id: card.value_id,
-              value_en: card.value_en,
-              detail_id: card.detail_id,
-              detail_en: card.detail_en,
+              label_en: card.label_en || card.label_id,
+              value_id: card.value_id || "-",
+              value_en: card.value_en || card.value_id || "-",
+              detail_id: card.detail_id || "-",
+              detail_en: card.detail_en || card.detail_id || "-",
             },
             { onConflict: "project_id, slot_index" }
           );
       }
 
       mutateProjects();
-      alert("Perubahan proyek berhasil disimpan!");
+      toast.success("Perubahan proyek berhasil disimpan!");
       router.push("/admin/projects");
     } catch (err: unknown) {
       console.error("Save edit error:", err);
-      alert(err instanceof Error ? `Gagal menyimpan perubahan: ${err.message}` : "Gagal menyimpan perubahan ke database. Silakan coba lagi.");
+      toast.error(
+        err instanceof Error
+          ? `Gagal menyimpan perubahan: ${err.message}`
+          : "Gagal menyimpan perubahan ke database. Silakan coba lagi."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -338,28 +313,29 @@ export default function EditProjectPage() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center text-xs text-slate-400">
-        Memuat detail proyek...
+      <div className="py-24 text-center flex flex-col items-center justify-center space-y-3">
+        <Loader2 className="h-8 w-8 animate-spin text-[#006bff]" />
+        <p className="text-xs font-semibold text-[#476788]">Memuat detail proyek...</p>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 w-full pb-16">
+    <form onSubmit={handleSubmit} className="space-y-6 w-full pb-16 font-sans">
       {/* Top Bar */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center border-b border-slate-200 pb-5">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center border-b border-[#d4e0ed] pb-5">
         <div>
           <Link
             href="/admin/projects"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#476788] hover:text-[#006bff] transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             Kembali ke Daftar Proyek
           </Link>
-          <h2 className="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">
-            Edit Proyek: {titleId}
+          <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#0b3558] sm:text-3xl">
+            Edit Proyek: {titleId || "Infrastruktur"}
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs sm:text-sm text-[#476788] mt-1">
             Perbarui data teknis atau perbaiki terjemahan bahasa Inggris dengan AI
           </p>
         </div>
@@ -368,7 +344,7 @@ export default function EditProjectPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-5 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-teal-800 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#006bff] hover:bg-[#0058d6] px-5 py-2.5 text-xs font-semibold text-white shadow-[0_4px_14px_rgba(0,107,255,0.25)] transition-all disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
             {submitting ? "Menyimpan..." : "Simpan Perubahan"}
@@ -377,59 +353,59 @@ export default function EditProjectPage() {
       </div>
 
       {/* SECTION 1: INFORMASI UMUM (BILINGUAL) + AI TRANSLATION */}
-      <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-5">
-        <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2">
-            <Globe2 className="h-5 w-5 text-teal-700" />
+      <div className="rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_16px_rgba(71,103,136,0.04)] space-y-5">
+        <div className="flex flex-col justify-between gap-3 border-b border-[#d4e0ed] pb-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2.5">
+            <Globe2 className="h-5 w-5 text-[#006bff]" />
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
+              <h3 className="text-base font-bold text-[#0b3558] tracking-tight">
                 1. Informasi Proyek (Bilingual)
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#476788] mt-0.5">
                 Edit Bahasa Indonesia dan generate otomatis bahasa Inggris dengan AI
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2.5 pt-2 sm:pt-0">
             <button
               type="button"
               onClick={handleAITranslate}
               disabled={translating}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-[#006bff] to-[#0099ff] hover:opacity-95 px-3.5 py-2 text-xs font-semibold text-white shadow-xs transition-all disabled:opacity-50"
             >
               {translating ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-700" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Menerjemahkan dengan AI...
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3.5 w-3.5 text-purple-600" />
+                  <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                   Perbarui Terjemahan ke English
                 </>
               )}
             </button>
 
-            <div className="flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold border border-slate-200">
+            <div className="flex rounded-full bg-[#f0f3f8] p-1 text-xs font-semibold border border-[#d4e0ed]">
               <button
                 type="button"
                 onClick={() => setActiveLangTab("id")}
-                className={`rounded-md px-3 py-1 transition-colors ${
+                className={`rounded-full px-3.5 py-1 transition-all ${
                   activeLangTab === "id"
-                    ? "bg-white text-slate-900 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-[#006bff] text-white shadow-xs"
+                    : "text-[#476788] hover:text-[#0b3558]"
                 }`}
               >
-                Bahasa Indonesia
+                Indonesia
               </button>
               <button
                 type="button"
                 onClick={() => setActiveLangTab("en")}
-                className={`rounded-md px-3 py-1 transition-colors ${
+                className={`rounded-full px-3.5 py-1 transition-all ${
                   activeLangTab === "en"
-                    ? "bg-white text-teal-800 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "bg-[#006bff] text-white shadow-xs"
+                    : "text-[#476788] hover:text-[#0b3558]"
                 }`}
               >
                 English
@@ -438,22 +414,9 @@ export default function EditProjectPage() {
           </div>
         </div>
 
-        {translateNotice && (
-          <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-xs text-teal-800 flex items-center justify-between">
-            <span>{translateNotice}</span>
-            <button
-              type="button"
-              onClick={() => setTranslateNotice("")}
-              className="text-teal-600 font-bold hover:underline ml-2"
-            >
-              Tutup
-            </button>
-          </div>
-        )}
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
               MindAR Target Index
             </label>
             <input
@@ -462,12 +425,12 @@ export default function EditProjectPage() {
               required
               value={targetIndex}
               onChange={(e) => setTargetIndex(parseInt(e.target.value) || 0)}
-              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs font-bold text-slate-900 outline-none focus:border-teal-600 focus:bg-white"
+              className="h-10 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] px-3.5 font-mono text-xs font-bold text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
+            <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
               URL Slug
             </label>
             <input
@@ -475,86 +438,86 @@ export default function EditProjectPage() {
               required
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 font-mono text-xs text-slate-900 outline-none focus:border-teal-600 focus:bg-white"
+              className="h-10 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] px-3.5 font-mono text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
             />
           </div>
 
           {activeLangTab === "id" ? (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nama Proyek (Indonesia)
+                <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
+                  Nama Proyek (Indonesia) *
                 </label>
                 <input
                   type="text"
                   required
                   value={titleId}
                   onChange={(e) => setTitleId(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-900 outline-none focus:border-teal-600"
+                  className="h-10 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] px-3.5 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Kategori Infrastruktur (Indonesia)
+                <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
+                  Kategori Infrastruktur (Indonesia) *
                 </label>
                 <input
                   type="text"
                   required
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-900 outline-none focus:border-teal-600"
+                  className="h-10 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] px-3.5 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Deskripsi Singkat (Indonesia)
+                <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
+                  Deskripsi Singkat (Indonesia) *
                 </label>
                 <textarea
                   rows={3}
                   required
                   value={descId}
                   onChange={(e) => setDescId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-900 outline-none focus:border-teal-600"
+                  className="w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] p-3 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
                 />
               </div>
             </>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
                   Project Title (English)
                 </label>
                 <input
                   type="text"
                   value={titleEn}
                   onChange={(e) => setTitleEn(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-900 outline-none focus:border-teal-600"
+                  className="h-10 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] px-3.5 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
                   Category (English)
                 </label>
                 <input
                   type="text"
                   value={categoryEn}
                   onChange={(e) => setCategoryEn(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-900 outline-none focus:border-teal-600"
+                  className="h-10 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] px-3.5 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
                   Short Description (English)
                 </label>
                 <textarea
                   rows={3}
                   value={descEn}
                   onChange={(e) => setDescEn(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-900 outline-none focus:border-teal-600"
+                  className="w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] p-3 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all"
                 />
               </div>
             </>
@@ -563,90 +526,146 @@ export default function EditProjectPage() {
       </div>
 
       {/* SECTION 2: 3D GLB MODEL & SCALER */}
-      <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-        <div className="border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-teal-700" />
-            <h3 className="text-sm font-bold text-slate-900">
+      <div className="rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_16px_rgba(71,103,136,0.04)] space-y-4">
+        <div className="border-b border-[#d4e0ed] pb-3">
+          <div className="flex items-center gap-2.5">
+            <Building2 className="h-5 w-5 text-[#006bff]" />
+            <h3 className="text-base font-bold text-[#0b3558] tracking-tight">
               2. Model 3D GLB & Kalibrasi Ukuran
             </h3>
           </div>
+          <p className="text-xs text-[#476788] mt-0.5">
+            Unggah file .glb dan sesuaikan skala objek secara visual
+          </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2">
+            <label className="block text-xs font-semibold text-[#0b3558] mb-2">
               Ganti File Model (.glb)
             </label>
             <GLBUploader
               currentModelUrl={modelUrl}
-              onModelUploaded={(url) => setModelUrl(url)}
+              onModelUploaded={(url) => {
+                setModelUrl(url);
+                toast.success("Model 3D berhasil diperbarui!");
+              }}
             />
+
+            <div className="mt-4 rounded-xl border border-[#d4e0ed] bg-[#f8f9fb] p-3.5 text-xs">
+              <span className="block font-bold text-[#0b3558] mb-2">
+                Atau pilih model preset:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  {
+                    name: "Masjid Raya",
+                    url: getPublicStorageUrl("ar-models", "mosque.glb"),
+                    scale: "0.1 0.1 0.1",
+                  },
+                  {
+                    name: "Bendungan",
+                    url: getPublicStorageUrl("ar-models", "bendungan.glb"),
+                    scale: "0.05 0.05 0.05",
+                  },
+                  {
+                    name: "Gedung",
+                    url: getPublicStorageUrl("ar-models", "cikasda.glb"),
+                    scale: "0.2 0.2 0.2",
+                  },
+                ].map((m) => (
+                  <button
+                    key={m.url}
+                    type="button"
+                    onClick={() => {
+                      setModelUrl(m.url);
+                      setModelScale(m.scale);
+                      toast.info(`Memilih preset: ${m.name}`);
+                    }}
+                    className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all ${
+                      modelUrl === m.url
+                        ? "border-[#006bff] bg-[#e6f0ff] text-[#004eba] shadow-xs"
+                        : "border-[#d4e0ed] bg-white text-[#0b3558] hover:bg-[#f0f3f8]"
+                    }`}
+                  >
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-2">
+            <label className="block text-xs font-semibold text-[#0b3558] mb-2">
               Pratinjau 3D & Kalibrasi Skala
             </label>
-            <ModelViewer3D
-              modelUrl={modelUrl}
-              initialScale={modelScale}
-              onScaleChange={(scaleStr) => setModelScale(scaleStr)}
-            />
+            <div className="relative rounded-2xl overflow-hidden border border-[#d4e0ed] bg-[#f8f9fb]">
+              <ModelViewer3D
+                modelUrl={modelUrl}
+                initialScale={modelScale}
+                onScaleChange={(scaleStr) => setModelScale(scaleStr)}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* SECTION 3: GAMBAR TARGET MARKER */}
-      <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-        <div className="border-b border-slate-200 pb-3">
-          <div className="flex items-center gap-2">
-            <FileImage className="h-5 w-5 text-teal-700" />
-            <h3 className="text-sm font-bold text-slate-900">
+      <div className="rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_16px_rgba(71,103,136,0.04)] space-y-4">
+        <div className="border-b border-[#d4e0ed] pb-3">
+          <div className="flex items-center gap-2.5">
+            <FileImage className="h-5 w-5 text-[#006bff]" />
+            <h3 className="text-base font-bold text-[#0b3558] tracking-tight">
               3. Gambar Target Marker
             </h3>
           </div>
+          <p className="text-xs text-[#476788] mt-0.5">
+            Gambar fisik yang discan oleh pengunjung untuk memunculkan model di layar AR
+          </p>
         </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center">
+          <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-xl border border-[#d4e0ed] bg-[#f8f9fb] flex items-center justify-center shadow-xs">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={markerImageUrl}
               alt="Marker"
-              className="h-full w-full object-cover"
+              className="h-full w-full object-contain p-2"
             />
           </div>
 
-          <div className="flex-1 space-y-1.5">
-            <label className="block text-xs font-semibold text-slate-700">
-              Ganti Foto Marker
+          <div className="flex-1 space-y-2">
+            <label className="block text-xs font-semibold text-[#0b3558]">
+              Ganti Foto Marker (JPG / PNG)
             </label>
             <input
               type="file"
               accept="image/png, image/jpeg, image/webp"
               onChange={handleMarkerUpload}
-              className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200"
+              className="block w-full text-xs text-[#476788] file:mr-3 file:rounded-lg file:border-0 file:bg-[#e6f0ff] file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[#004eba] hover:file:bg-[#d4e0ed] transition-colors"
             />
+            <p className="text-[11px] text-[#a6bbd1]">
+              Gunakan foto dengan kontras tajam, tekstur detail, dan tanpa pantulan silau.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* SECTION 4: 4 KARTU INFORMASI */}
-      <div className="w-full rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-        <div className="flex flex-col justify-between gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-teal-700" />
+      {/* SECTION 4: 4 KARTU INFORMASI PUBLIK */}
+      <div className="rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_16px_rgba(71,103,136,0.04)] space-y-4">
+        <div className="flex flex-col justify-between gap-2 border-b border-[#d4e0ed] pb-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2.5">
+            <Layers className="h-5 w-5 text-[#006bff]" />
             <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                4. Konfigurasi 4 Kartu Informasi Publik
+              <h3 className="text-base font-bold text-[#0b3558] tracking-tight">
+                4. Konfigurasi 4 Kartu Spesifikasi Publik
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#476788] mt-0.5">
                 Data spesifikasi yang muncul saat objek discan kamera AR
               </p>
             </div>
           </div>
-          <span className="text-xs font-semibold text-teal-800 bg-teal-50 border border-teal-200 rounded px-2 py-0.5">
+          <span className="text-[11px] font-semibold text-[#004eba] bg-[#e6f0ff] border border-[#d4e0ed] rounded-full px-3 py-1 w-fit">
             Mendukung Terjemahan Otomatis
           </span>
         </div>
@@ -659,104 +678,77 @@ export default function EditProjectPage() {
             return (
               <div
                 key={card.slot_index}
-                className="rounded-lg border border-slate-200 bg-slate-50/70 p-4 space-y-3"
+                className="rounded-2xl border border-[#d4e0ed] bg-[#f8f9fb] p-4 space-y-3 shadow-xs"
               >
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                <div className="flex items-center justify-between border-b border-[#d4e0ed]/70 pb-2.5">
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-teal-50 p-1 text-teal-700 border border-teal-200">
-                      <IconComp className="h-4 w-4" />
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#e6f0ff] text-[#004eba] border border-[#d4e0ed]">
+                      <IconComp className="h-3.5 w-3.5" />
                     </span>
-                    <span className="text-xs font-bold text-slate-900">
+                    <span className="text-xs font-bold text-[#0b3558]">
                       {currentPreset.label}
                     </span>
                   </div>
-                  <span className="text-[11px] font-semibold text-slate-400">
-                    {activeLangTab === "id" ? "🇮🇩 ID" : "🇬🇧 EN"}
+                  <span className="text-[11px] font-mono text-[#a6bbd1]">
+                    Slot #{card.slot_index + 1}
                   </span>
                 </div>
 
-                {activeLangTab === "id" ? (
-                  <>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Label Singkat (ID)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={card.label_id}
-                          onChange={(e) => handleCardChange(idx, "label_id", e.target.value)}
-                          className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-teal-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Nilai Utama (ID)
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={card.value_id}
-                          onChange={(e) => handleCardChange(idx, "value_id", e.target.value)}
-                          className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-teal-600"
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#476788] mb-1">
+                      Label / Judul Kartu ({activeLangTab === "id" ? "ID" : "EN"})
+                    </label>
+                    <input
+                      type="text"
+                      value={activeLangTab === "id" ? card.label_id : card.label_en}
+                      onChange={(e) =>
+                        handleCardChange(
+                          idx,
+                          activeLangTab === "id" ? "label_id" : "label_en",
+                          e.target.value
+                        )
+                      }
+                      className="h-8.5 w-full rounded-lg border border-[#d4e0ed] bg-white px-3 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:ring-1 focus:ring-[#006bff]"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Deskripsi Detail (ID)
-                      </label>
-                      <textarea
-                        rows={3}
-                        required
-                        value={card.detail_id}
-                        onChange={(e) => handleCardChange(idx, "detail_id", e.target.value)}
-                        className="w-full rounded border border-slate-200 bg-white p-2 text-xs text-slate-900 outline-none focus:border-teal-600"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Card Label (EN)
-                        </label>
-                        <input
-                          type="text"
-                          value={card.label_en}
-                          onChange={(e) => handleCardChange(idx, "label_en", e.target.value)}
-                          className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs text-slate-900 outline-none focus:border-teal-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          Key Value (EN)
-                        </label>
-                        <input
-                          type="text"
-                          value={card.value_en}
-                          onChange={(e) => handleCardChange(idx, "value_en", e.target.value)}
-                          className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-teal-600"
-                        />
-                      </div>
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#476788] mb-1">
+                      Nilai Utama / Angka Kunci ({activeLangTab === "id" ? "ID" : "EN"})
+                    </label>
+                    <input
+                      type="text"
+                      value={activeLangTab === "id" ? card.value_id : card.value_en}
+                      onChange={(e) =>
+                        handleCardChange(
+                          idx,
+                          activeLangTab === "id" ? "value_id" : "value_en",
+                          e.target.value
+                        )
+                      }
+                      className="h-8.5 w-full rounded-lg border border-[#d4e0ed] bg-white px-3 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:ring-1 focus:ring-[#006bff]"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Detailed Description (EN)
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={card.detail_en}
-                        onChange={(e) => handleCardChange(idx, "detail_en", e.target.value)}
-                        className="w-full rounded border border-slate-200 bg-white p-2 text-xs text-slate-900 outline-none focus:border-teal-600"
-                      />
-                    </div>
-                  </>
-                )}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[#476788] mb-1">
+                      Keterangan Lengkap ({activeLangTab === "id" ? "ID" : "EN"})
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={activeLangTab === "id" ? card.detail_id : card.detail_en}
+                      onChange={(e) =>
+                        handleCardChange(
+                          idx,
+                          activeLangTab === "id" ? "detail_id" : "detail_en",
+                          e.target.value
+                        )
+                      }
+                      className="w-full rounded-lg border border-[#d4e0ed] bg-white p-2.5 text-xs text-[#0b3558] outline-none focus:border-[#006bff] focus:ring-1 focus:ring-[#006bff]"
+                    />
+                  </div>
+                </div>
               </div>
             );
           })}
@@ -767,7 +759,7 @@ export default function EditProjectPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-6 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-teal-800 transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-[#006bff] hover:bg-[#0058d6] px-6 py-2.5 text-xs font-semibold text-white shadow-[0_4px_14px_rgba(0,107,255,0.25)] transition-all disabled:opacity-50"
         >
           <Save className="h-4 w-4" />
           {submitting ? "Menyimpan Perubahan..." : "Simpan Perubahan Proyek"}

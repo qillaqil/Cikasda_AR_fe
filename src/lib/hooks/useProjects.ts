@@ -1,12 +1,12 @@
 import useSWR, { mutate as globalMutate } from "swr";
-import { createClient } from "@/lib/supabase/client";
+import { createClient, getPublicStorageUrl } from "@/lib/supabase/client";
 import { DatabaseProject } from "@/lib/supabase/types";
-import { arModels } from "@/context/LanguageContext";
 
 const supabase = createClient();
 export const PROJECTS_CACHE_KEY = "cikasda_ar_projects";
+export const BUNDLE_CACHE_KEY = "cikasda_mindar_bundle";
 
-// Fetcher for all projects with cards
+// Fetcher for all projects with cards from Supabase (Pure database source, no hardcoded models)
 async function fetchProjects(): Promise<DatabaseProject[]> {
   try {
     const { data, error } = await supabase
@@ -14,50 +14,25 @@ async function fetchProjects(): Promise<DatabaseProject[]> {
       .select("*, cards:ar_project_cards(*)")
       .order("target_index", { ascending: true });
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       return data as DatabaseProject[];
     }
   } catch (err) {
-    console.warn("Supabase fetch error, using fallback data:", err);
+    console.warn("Supabase fetch error:", err);
   }
 
-  // Fallback to local default data
-  return arModels.id.map((item) => ({
-    id: String(item.id),
-    target_index: item.id,
-    slug: item.title.toLowerCase().replace(/\s+/g, "-"),
-    category_id: item.category,
-    category_en: item.category,
-    title_id: item.title,
-    title_en: item.title,
-    description_id: item.description,
-    description_en: item.description,
-    model_url: item.modelUrl,
-    model_scale: item.scale,
-    marker_image_url: "/contohAR.png",
-    is_active: true,
-    cards: item.cards.map((c, idx) => ({
-      slot_index: idx,
-      icon_name: idx === 0 ? "Building2" : idx === 1 ? "Users" : idx === 2 ? "CalendarDays" : "MapPin",
-      label_id: c.label,
-      label_en: c.label,
-      value_id: c.value,
-      value_en: c.value,
-      detail_id: c.detail,
-      detail_en: c.detail,
-    })),
-  }));
+  return [];
 }
 
-// Hook for fetching all projects with SWR caching
+// Hook for fetching all projects with SWR in-memory caching & deduplication
 export function useProjects() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<DatabaseProject[]>(
     PROJECTS_CACHE_KEY,
     fetchProjects,
     {
-      revalidateOnFocus: false, // Don't constantly refetch on window focus
+      revalidateOnFocus: false, // Don't refetch on window focus
       revalidateIfStale: false,
-      dedupingInterval: 30000, // Cache for 30s before refetching
+      dedupingInterval: 30000, // In-memory SWR cache for 30 seconds
     }
   );
 
@@ -86,4 +61,48 @@ export function useProject(id: string | null) {
 
 export function invalidateProjectsCache() {
   return globalMutate(PROJECTS_CACHE_KEY);
+}
+
+// Fetcher for active MindAR compiled bundle (.mind)
+async function fetchActiveBundle(): Promise<string> {
+  const defaultBundle = getPublicStorageUrl("ar-markers", "targets.mind");
+  try {
+    const { data: bundleData, error } = await supabase
+      .from("mindar_bundles")
+      .select("bundle_url")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && bundleData?.bundle_url) {
+      return bundleData.bundle_url;
+    }
+  } catch (err) {
+    console.warn("Bundle fetch error, using fallback targets.mind:", err);
+  }
+  return defaultBundle;
+}
+
+// Hook for fetching active MindAR bundle with SWR caching
+export function useMindARBundle() {
+  const { data, isLoading, mutate } = useSWR<string>(
+    BUNDLE_CACHE_KEY,
+    fetchActiveBundle,
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      dedupingInterval: 60000, // Cache for 60s
+    }
+  );
+
+  return {
+    bundleUrl: data ?? getPublicStorageUrl("ar-markers", "targets.mind"),
+    isLoading,
+    mutateBundle: mutate,
+  };
+}
+
+export function invalidateBundleCache() {
+  return globalMutate(BUNDLE_CACHE_KEY);
 }

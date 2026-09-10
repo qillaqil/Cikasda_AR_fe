@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, Lock, Mail, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -71,6 +72,7 @@ export default function AdminLoginPage() {
     const cleanInput = email.trim().toLowerCase();
     if (!cleanInput || !password) {
       setErrorMsg("Email / username dan kata sandi wajib diisi.");
+      toast.error("Email dan kata sandi wajib diisi.");
       setLoading(false);
       return;
     }
@@ -116,14 +118,14 @@ export default function AdminLoginPage() {
             sessionStorage.setItem("cikasda_login_lockout_until", lockoutUntil.toString());
           } catch {}
           setLockoutCountdown(Math.ceil(LOCKOUT_DURATION_MS / 1000));
-          setErrorMsg(
-            "Terlalu banyak percobaan gagal (5x berturut-turut). Portal dikunci sementara demi keamanan."
-          );
+          const msg = "Terlalu banyak percobaan gagal (5x). Portal dikunci sementara 30 detik.";
+          setErrorMsg(msg);
+          toast.error(msg);
         } else {
           const remaining = MAX_FAILED_ATTEMPTS - nextAttempts;
-          setErrorMsg(
-            `Kombinasi email atau kata sandi tidak valid. Sisa percobaan: ${remaining} kali sebelum portal dikunci sementara.`
-          );
+          const msg = `Kombinasi login tidak valid. Sisa percobaan: ${remaining} kali.`;
+          setErrorMsg(msg);
+          toast.error(msg);
         }
       } else {
         // Reset attempts on successful login
@@ -131,56 +133,63 @@ export default function AdminLoginPage() {
           sessionStorage.removeItem("cikasda_login_lockout_until");
           sessionStorage.removeItem("cikasda_login_failed_attempts");
         } catch {}
+        toast.success("Autentikasi berhasil! Mengalihkan ke dashboard...");
         router.replace("/admin/dashboard");
       }
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan pada sistem autentikasi.");
+      const msg = err instanceof Error ? err.message : "Terjadi kesalahan pada sistem autentikasi.";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12 text-slate-900">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center bg-[#f8f9fb] px-4 py-12 text-[#0b3558] overflow-hidden font-sans">
+      {/* Calendly Soft Gradient Atmosphere Blobs */}
+      <div className="pointer-events-none absolute -left-20 -top-20 h-80 w-80 rounded-full bg-[#0099ff]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 -bottom-20 h-80 w-80 rounded-full bg-[#e55cff]/10 blur-3xl" />
+
+      <div className="relative z-10 w-full max-w-md">
         {/* Card */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="rounded-3xl border border-[#d4e0ed] bg-white p-7 sm:p-10 shadow-[0_8px_30px_rgba(71,103,136,0.08)]">
           {/* Header */}
           <div className="text-center">
             <div className="flex justify-center mb-3">
               <Image
                 src="/logo-cikasda-v2.webp"
                 alt="CIKASDA"
-                width={160}
-                height={48}
+                width={150}
+                height={42}
                 className="h-9 w-auto object-contain"
                 priority
               />
             </div>
 
-            <h2 className="text-lg font-bold text-slate-900 sm:text-xl">
+            <h2 className="text-xl font-bold tracking-tight text-[#0b3558] sm:text-2xl">
               Portal Admin WebAR
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-[#476788]">
               Dinas Cipta Karya & Sumber Daya Air Provinsi Sulawesi Tengah
             </p>
           </div>
 
           {/* Lockout Warning Banner */}
           {lockoutCountdown > 0 ? (
-            <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+            <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900">
               <ShieldAlert className="h-4 w-4 shrink-0 text-amber-700 mt-0.5" />
               <div className="flex-1">
                 <p className="font-bold text-amber-950">
                   Portal Terkunci Sementara ({lockoutCountdown} detik)
                 </p>
-                <p className="mt-0.5 text-amber-800">
-                  Terdeteksi 5 kali kegagalan login berturut-turut. Demi keamanan sistem, akses verifikasi ditangguhkan sementara.
+                <p className="mt-0.5 text-amber-800 leading-relaxed">
+                  Terdeteksi 5 kali kegagalan login berturut-turut. Akses otentikasi ditangguhkan sementara.
                 </p>
               </div>
             </div>
           ) : errorMsg ? (
-            <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+            <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-700 font-medium leading-relaxed">
               {errorMsg}
             </div>
           ) : null}
@@ -188,11 +197,11 @@ export default function AdminLoginPage() {
           {/* Form */}
           <form onSubmit={handleLogin} className="mt-6 space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
                 Email / Username Pengelola
               </label>
               <div className="relative flex items-center">
-                <Mail className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
+                <Mail className="pointer-events-none absolute left-3.5 h-4 w-4 text-[#a6bbd1]" />
                 <input
                   type="text"
                   required
@@ -201,17 +210,17 @@ export default function AdminLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Masukkan email atau username"
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  className="h-11 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] pl-10 pr-3.5 text-xs text-[#0b3558] placeholder:text-[#a6bbd1] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all disabled:bg-[#f0f3f8] disabled:text-[#a6bbd1] disabled:cursor-not-allowed"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-[#0b3558] mb-1.5">
                 Kata Sandi
               </label>
               <div className="relative flex items-center">
-                <Lock className="pointer-events-none absolute left-3 h-4 w-4 text-slate-400" />
+                <Lock className="pointer-events-none absolute left-3.5 h-4 w-4 text-[#a6bbd1]" />
                 <input
                   type="password"
                   required
@@ -220,7 +229,7 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  className="h-11 w-full rounded-lg border border-[#d4e0ed] bg-[#f0f3f8] pl-10 pr-3.5 text-xs text-[#0b3558] placeholder:text-[#a6bbd1] outline-none focus:border-[#006bff] focus:bg-white focus:ring-1 focus:ring-[#006bff] transition-all disabled:bg-[#f0f3f8] disabled:text-[#a6bbd1] disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -228,23 +237,23 @@ export default function AdminLoginPage() {
             <button
               type="submit"
               disabled={loading || lockoutCountdown > 0}
-              className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-teal-700 text-xs font-semibold text-white shadow-xs hover:bg-teal-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#006bff] hover:bg-[#0058d6] text-xs font-semibold text-white shadow-[0_4px_14px_rgba(0,107,255,0.25)] hover:shadow-[0_6px_18px_rgba(0,107,255,0.35)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {lockoutCountdown > 0 ? (
                 `Terkunci (${lockoutCountdown}d)`
               ) : loading ? (
-                "Memverifikasi..."
+                "Memverifikasi Sesi..."
               ) : (
                 <>
                   Masuk ke Dashboard
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-4 w-4" />
                 </>
               )}
             </button>
           </form>
         </div>
 
-        <p className="mt-4 text-center text-xs text-slate-400">
+        <p className="mt-5 text-center text-xs text-[#a6bbd1]">
           © 2026 Dinas CIKASDA Provinsi Sulawesi Tengah
         </p>
       </div>
