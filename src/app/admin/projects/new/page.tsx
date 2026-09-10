@@ -168,6 +168,15 @@ export default function NewProjectPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      alert("File marker harus berupa gambar (PNG, JPG, JPEG, WEBP).");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Ukuran file gambar marker maksimal 10MB.");
+      return;
+    }
+
     const localUrl = URL.createObjectURL(file);
     setMarkerImageUrl(localUrl);
 

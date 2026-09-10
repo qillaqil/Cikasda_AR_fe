@@ -19,8 +19,9 @@ function cleanupRateLimitMap(now: number) {
 export async function POST(req: Request) {
   try {
     const rawIp =
-      req.headers.get("x-forwarded-for") ||
+      req.headers.get("x-vercel-ip") ||
       req.headers.get("x-real-ip") ||
+      req.headers.get("x-forwarded-for") ||
       "anonymous";
     const ip = rawIp.split(",")[0].trim();
     const now = Date.now();

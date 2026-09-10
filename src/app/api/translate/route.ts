@@ -18,7 +18,11 @@ function cleanupTranslateRateLimitMap(now: number) {
 
 export async function POST(req: Request) {
   try {
-    const rawIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "anonymous";
+    const rawIp =
+      req.headers.get("x-vercel-ip") ||
+      req.headers.get("x-real-ip") ||
+      req.headers.get("x-forwarded-for") ||
+      "anonymous";
     const ip = rawIp.split(",")[0].trim();
     const now = Date.now();
 
@@ -50,8 +54,16 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
-    const { title, category, description, cards } = body;
+    let body;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json(
+        { error: "Format request tidak valid (JSON corrupt)." },
+        { status: 400 }
+      );
+    }
+    const { title, category, description, cards } = body || {};
 
     // Strict input length validation against token-exhaustion DoS
     if (
