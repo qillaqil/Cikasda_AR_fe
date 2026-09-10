@@ -179,27 +179,30 @@ export default function NewProjectPage() {
     const localUrl = URL.createObjectURL(file);
     setMarkerImageUrl(localUrl);
 
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (supabaseUrl && !supabaseUrl.includes("placeholder-project")) {
-      try {
-        const cleanName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-        const { data, error } = await supabase.storage
-          .from("ar-markers")
-          .upload(cleanName, file, { upsert: false });
+    const toastId = toast.loading("Mengunggah gambar marker ke Supabase Storage...");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "ar-markers");
 
-        if (!error && data) {
-          const { data: publicData } = supabase.storage
-            .from("ar-markers")
-            .getPublicUrl(data.path);
-          if (publicData?.publicUrl) {
-            setMarkerImageUrl(publicData.publicUrl);
-            toast.success("Gambar marker berhasil diunggah ke storage.");
-          }
-        }
-      } catch (err) {
-        console.error("Marker upload err:", err);
-        toast.error("Gagal mengunggah gambar marker.");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Gagal mengunggah marker ke server.");
       }
+
+      setMarkerImageUrl(result.publicUrl);
+      toast.success("Gambar marker berhasil diunggah ke Supabase Storage!", { id: toastId });
+    } catch (err) {
+      console.error("Marker upload err:", err);
+      toast.error(
+        "Gagal mengunggah gambar marker: " + (err instanceof Error ? err.message : "Terjadi kesalahan"),
+        { id: toastId }
+      );
     }
   };
 

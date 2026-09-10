@@ -5,16 +5,22 @@ import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Cpu,
+  Database,
   Download,
+  ExternalLink,
   Layers,
   Loader2,
   Play,
   Plus,
   RotateCcw,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
-import { createClient } from "@/lib/supabase/client";
-import { useProjects } from "@/lib/hooks/useProjects";
+import {
+  useProjects,
+  useMindARBundle,
+  invalidateBundleCache,
+} from "@/lib/hooks/useProjects";
 
 declare global {
   interface Window {
@@ -34,113 +40,223 @@ declare global {
 
 export default function MindARMarkersPage() {
   const { activeProjects: projects, isLoading: loading, mutateProjects } = useProjects();
+  const { bundleUrl: activeStorageBundle, mutateBundle } = useMindARBundle();
+
   const [compiling, setCompiling] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState("");
   const [compilerReady, setCompilerReady] = useState(false);
   const [bundleUrl, setBundleUrl] = useState<string | null>(null);
-  const supabase = createClient();
 
+  // Load MindAR compiler ES module from CDN
   useEffect(() => {
-    const SCRIPT_ID = "mindar-compiler-script";
-    if (document.getElementById(SCRIPT_ID)) {
-      setCompilerReady(true);
-      return;
+    let isMounted = true;
+
+    async function initCompiler() {
+      // 1. Cek jika sudah terpasang di window
+      if (window.MINDAR?.IMAGE?.Compiler) {
+        if (isMounted) setCompilerReady(true);
+        return;
+      }
+
+      // 2. Gunakan native dynamic import browser untuk memuat ES Module
+      try {
+        const loadModule = (url: string) =>
+          new Function("url", "return import(url)")(url);
+        const mod = await loadModule(
+          "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"
+        );
+        if (mod && isMounted) {
+          setCompilerReady(true);
+          return;
+        }
+      } catch (err) {
+        console.warn(
+          "Dynamic import gagal, mencoba script tag module fallback:",
+          err
+        );
+      }
+
+      // 3. Fallback: script tag dengan type="module"
+      const SCRIPT_ID = "mindar-compiler-script";
+      if (!document.getElementById(SCRIPT_ID)) {
+        const script = document.createElement("script");
+        script.id = SCRIPT_ID;
+        script.type = "module";
+        script.src =
+          "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js";
+        script.onload = () => {
+          if (isMounted) setCompilerReady(true);
+        };
+        script.onerror = (e) => {
+          console.error("Gagal memuat script MindAR:", e);
+        };
+        document.head.appendChild(script);
+      }
     }
 
-    const script = document.createElement("script");
-    script.id = SCRIPT_ID;
-    script.src = "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js";
-    script.async = true;
-    script.onload = () => {
-      setCompilerReady(true);
+    initCompiler();
+
+    return () => {
+      isMounted = false;
     };
-    document.head.appendChild(script);
   }, []);
 
   const handleCompileMarkers = async () => {
-    if (!compilerReady || !window.MINDAR?.IMAGE?.Compiler) {
-      toast.warning("Compiler MindAR sedang diunduh di browser, silakan tunggu beberapa detik...");
+    // 1. Validasi ketersediaan Compiler
+    let CompilerClass = window.MINDAR?.IMAGE?.Compiler;
+    if (!CompilerClass) {
+      try {
+        const loadModule = (url: string) =>
+          new Function("url", "return import(url)")(url);
+        const mod = await loadModule(
+          "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"
+        );
+        CompilerClass = mod?.Compiler || window.MINDAR?.IMAGE?.Compiler;
+      } catch (e) {
+        console.error("Tidak dapat memuat class Compiler MindAR:", e);
+      }
+    }
+
+    if (!CompilerClass) {
+      toast.warning(
+        "Compiler MindAR sedang dimuat di browser. Silakan tunggu beberapa detik atau segarkan halaman."
+      );
+      return;
+    }
+
+    if (!projects || projects.length === 0) {
+      toast.warning("Tidak ada target marker aktif untuk dikompilasi.");
       return;
     }
 
     setCompiling(true);
     setProgress(0);
-    toast.info(`Memulai kompilasi ${projects.length} gambar marker target...`);
+    const toastId = toast.loading(
+      `Memulai kompilasi ${projects.length} target marker...`
+    );
+
+    const createdBlobUrls: string[] = [];
 
     try {
-      const compiler = new window.MINDAR.IMAGE.Compiler();
-
+      // 2. Muat seluruh gambar marker ke dalam HTMLImageElement menggunakan Blob lokal
+      // Menggunakan local Blob URL menjamin tidak ada CORS canvas tainting saat compiler membaca pixel
       const imageElements: HTMLImageElement[] = [];
-      for (const proj of projects) {
-        const img = new window.Image();
-        img.crossOrigin = "anonymous";
-        img.src = proj.marker_image_url || "/contohAR.png";
-        await new Promise((resolve) => {
-          img.onload = () => resolve(true);
-          img.onerror = () => resolve(false);
+
+      for (let i = 0; i < projects.length; i++) {
+        const proj = projects[i];
+        const rawUrl = proj.marker_image_url || "/contohAR.png";
+        const msg = `Memuat gambar target #${proj.target_index}: ${proj.title_id}...`;
+        setStatusText(msg);
+        toast.loading(msg, { id: toastId });
+
+        const res = await fetch(rawUrl);
+        if (!res.ok) {
+          throw new Error(
+            `Gagal mengunduh gambar marker untuk ${proj.title_id} (Status: ${res.status})`
+          );
+        }
+
+        const imgBlob = await res.blob();
+        const objectUrl = URL.createObjectURL(imgBlob);
+        createdBlobUrls.push(objectUrl);
+
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () =>
+            reject(
+              new Error(
+                `Format gambar tidak valid atau korup untuk: ${proj.title_id}`
+              )
+            );
+          img.src = objectUrl;
         });
+
         imageElements.push(img);
       }
 
-      await compiler.compileImageTargets(imageElements, (p) => {
-        setProgress(Math.round(p * 100));
+      // 3. Ekstraksi feature points dengan MindAR compiler
+      setStatusText("Mengekstrak feature points MindAR (0%)...");
+      toast.loading("Mengekstrak feature points MindAR (0%)...", {
+        id: toastId,
       });
 
+      const compiler = new CompilerClass();
+
+      await compiler.compileImageTargets(imageElements, (p: number) => {
+        const percent = Math.round(p * 100);
+        setProgress(percent);
+        const progressMsg = `Mengekstrak feature points MindAR (${percent}%)...`;
+        setStatusText(progressMsg);
+        toast.loading(progressMsg, { id: toastId });
+      });
+
+      // 4. Ekspor data binary .mind
+      setStatusText("Mengekspor binary targets.mind...");
+      toast.loading("Mengekspor binary targets.mind...", { id: toastId });
+
       const exportedBuffer = await compiler.exportData();
-      const blob = new Blob([exportedBuffer.buffer as ArrayBuffer], { type: "application/octet-stream" });
-      const localDownloadUrl = URL.createObjectURL(blob);
+      const mindBlob = new Blob([exportedBuffer.buffer as ArrayBuffer], {
+        type: "application/octet-stream",
+      });
+
+      // Simpan local object URL untuk instant download di browser
+      const localDownloadUrl = URL.createObjectURL(mindBlob);
       setBundleUrl(localDownloadUrl);
 
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      if (supabaseUrl && !supabaseUrl.includes("placeholder-project")) {
-        const bundleFileName = `targets-v${Date.now()}.mind`;
-        const { data, error } = await supabase.storage
-          .from("ar-markers")
-          .upload(bundleFileName, blob, {
-            contentType: "application/octet-stream",
-            upsert: true,
-          });
+      // 5. Unggah binary targets.mind ke Supabase Storage melalui Server API (Service Role)
+      setStatusText("Mengunggah targets.mind ke Supabase Storage...");
+      toast.loading("Mengunggah targets.mind ke Supabase Storage...", {
+        id: toastId,
+      });
 
-        if (!error && data) {
-          // Hapus file marker lama jika ada
-          const { data: files } = await supabase.storage.from("ar-markers").list();
-          if (files) {
-            const oldFiles = files
-              .filter((file: { name: string }) => file.name !== bundleFileName)
-              .map((file: { name: string }) => file.name);
+      const formData = new FormData();
+      formData.append("file", mindBlob, "targets.mind");
+      formData.append("totalTargets", String(projects.length));
 
-            if (oldFiles.length > 0) {
-              await supabase.storage.from("ar-markers").remove(oldFiles);
-            }
-          }
+      const apiRes = await fetch("/api/markers/compile", {
+        method: "POST",
+        body: formData,
+      });
 
-          const { data: publicData } = supabase.storage
-            .from("ar-markers")
-            .getPublicUrl(data.path);
-
-          if (publicData?.publicUrl) {
-            await supabase.from("mindar_bundles").insert({
-              bundle_url: publicData.publicUrl,
-              total_targets: projects.length,
-              is_active: true,
-            });
-            setBundleUrl(publicData.publicUrl);
-          }
-        }
+      const apiResult = await apiRes.json();
+      if (!apiRes.ok || !apiResult.success) {
+        throw new Error(
+          apiResult.error || "Gagal menyimpan binary targets.mind ke Supabase."
+        );
       }
 
-      toast.success(`Berhasil mengompilasi ${projects.length} target ke file targets.mind!`);
-      mutateProjects();
+      setBundleUrl(apiResult.bundleUrl);
+
+      // 6. Invalidate SWR Cache agar WebAR viewer & admin langsung memakai bundle terbaru
+      invalidateBundleCache();
+      await mutateBundle();
+      await mutateProjects();
+
+      toast.success(
+        `Sukses! ${projects.length} target marker berhasil dikompilasi & dipublikasikan ke Supabase Storage!`,
+        { id: toastId, duration: 6000 }
+      );
     } catch (err: unknown) {
       console.error("Compilation error:", err);
-      toast.error(
-        "Terjadi kendala saat kompilasi marker: " +
-          (err instanceof Error ? err.message : "Gagal memproses file gambar")
-      );
+      const errMsg =
+        err instanceof Error
+          ? err.message
+          : "Terjadi kendala teknis saat mengompilasi file marker.";
+      toast.error(`Gagal kompilasi: ${errMsg}`, {
+        id: toastId,
+        duration: 8000,
+      });
     } finally {
+      // Bersihkan memory local blob URL gambar
+      createdBlobUrls.forEach((url) => URL.revokeObjectURL(url));
       setCompiling(false);
+      setStatusText("");
     }
   };
+
+  const displayBundleUrl = bundleUrl || activeStorageBundle;
 
   return (
     <div className="space-y-6 w-full pb-12 font-sans">
@@ -150,12 +266,12 @@ export default function MindARMarkersPage() {
           MindAR Marker Studio & Compiler
         </h2>
         <p className="text-xs sm:text-sm text-[#476788] mt-1">
-          Kompilasi kumpulan gambar target marker menjadi satu file binary targets.mind secara langsung di browser
+          Kompilasi kumpulan gambar target marker menjadi satu file binary targets.mind dan simpan otomatis ke Supabase Storage
         </p>
       </div>
 
-      {/* Compiler Action Card with Calendly styling */}
-      <div className="relative overflow-hidden rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgba(71,103,136,0.06)] space-y-4">
+      {/* Compiler Action Card */}
+      <div className="relative overflow-hidden rounded-3xl border border-[#d4e0ed] bg-white p-6 sm:p-8 shadow-[0_4px_20px_rgba(71,103,136,0.06)] space-y-5">
         {/* Soft Decorative Accent Blob */}
         <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-[#006bff]/5 blur-2xl" />
 
@@ -163,13 +279,15 @@ export default function MindARMarkersPage() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full bg-[#e6f0ff] px-3 py-1 text-[11px] font-bold text-[#004eba] border border-[#d4e0ed] mb-2">
               <Cpu className="h-3.5 w-3.5 text-[#006bff]" />
-              In-Browser Feature Point Extraction
+              {compilerReady
+                ? "Compiler Siap (In-Browser WebAssembly)"
+                : "Menyiapkan Engine Compiler..."}
             </div>
             <h3 className="text-lg font-bold text-[#0b3558] tracking-tight">
               Kompilasi Seluruh Marker Aktif ({projects.length} Target)
             </h3>
             <p className="mt-1 text-xs text-[#476788] max-w-2xl leading-relaxed">
-              Ekstraksi feature points seluruh gambar target aktif menjadi satu file binary targets.mind untuk pelacakan kamera AR pengunjung.
+              Ekstraksi feature points seluruh gambar target aktif menjadi satu file binary targets.mind untuk pelacakan kamera AR pengunjung secara real-time.
             </p>
           </div>
 
@@ -193,10 +311,12 @@ export default function MindARMarkersPage() {
               )}
             </button>
 
-            {bundleUrl && (
+            {displayBundleUrl && (
               <a
-                href={bundleUrl}
+                href={displayBundleUrl}
                 download="targets.mind"
+                target="_blank"
+                rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[#d4e0ed] bg-white hover:bg-[#f0f3f8] px-3.5 py-2.5 text-xs font-semibold text-[#0b3558] shadow-xs transition-all"
               >
                 <Download className="h-3.5 w-3.5 text-[#006bff]" />
@@ -206,10 +326,11 @@ export default function MindARMarkersPage() {
           </div>
         </div>
 
+        {/* Progress Bar saat Kompilasi Aktif */}
         {compiling && (
-          <div className="relative z-10 space-y-2 pt-2">
+          <div className="relative z-10 space-y-2 pt-1">
             <div className="flex justify-between text-xs font-semibold text-[#0b3558]">
-              <span>Mengekstrak Feature Points MindAR...</span>
+              <span>{statusText || "Mengekstrak Feature Points MindAR..."}</span>
               <span className="font-mono text-[#006bff]">{progress}%</span>
             </div>
             <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#f0f3f8] border border-[#d4e0ed]">
@@ -218,6 +339,27 @@ export default function MindARMarkersPage() {
                 style={{ width: `${progress}%` }}
               />
             </div>
+          </div>
+        )}
+
+        {/* Info Box Status Storage Supabase */}
+        {displayBundleUrl && (
+          <div className="relative z-10 flex flex-col gap-2 rounded-2xl border border-[#d4e0ed] bg-[#f8f9fb] p-3.5 sm:flex-row sm:items-center sm:justify-between text-xs">
+            <div className="flex items-center gap-2 text-[#0b3558] truncate">
+              <Database className="h-4 w-4 text-[#006bff] shrink-0" />
+              <span className="font-bold">Bundle Aktif di Storage:</span>
+              <span className="font-mono text-[#476788] truncate text-[11px]">
+                {displayBundleUrl}
+              </span>
+            </div>
+            <a
+              href={displayBundleUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#006bff] hover:underline shrink-0"
+            >
+              Lihat File <ExternalLink className="h-3 w-3" />
+            </a>
           </div>
         )}
       </div>
@@ -235,6 +377,7 @@ export default function MindARMarkersPage() {
             type="button"
             onClick={() => {
               mutateProjects();
+              mutateBundle();
               toast.info("Memperbarui daftar marker...");
             }}
             className="inline-flex items-center gap-1 text-xs font-medium text-[#476788] hover:text-[#0b3558] transition-colors"
@@ -274,7 +417,7 @@ export default function MindARMarkersPage() {
                   {proj.title_id}
                 </h4>
                 <p className="text-[11px] text-[#476788] truncate mt-0.5">
-                  Model: {proj.model_url.split("/").pop()}
+                  Model: {proj.model_url ? proj.model_url.split("/").pop() : "Standard"}
                 </p>
               </div>
             </div>

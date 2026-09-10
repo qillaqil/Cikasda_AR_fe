@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, FileUp, Loader2, UploadCloud, X } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 interface GLBUploaderProps {
@@ -44,51 +45,52 @@ export default function GLBUploader({
 
     // Upload permanen ke Supabase Storage (bucket: ar-models)
 
-    // Upload ke Supabase Storage (bucket: ar-models)
+    // Upload ke Supabase Storage melalui server API (bypassing RLS)
     try {
       setUploading(true);
-      setProgress(20);
+      setProgress(30);
 
-      const cleanName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-      const { data, error } = await supabase.storage
-        .from("ar-models")
-        .upload(cleanName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "ar-models");
 
-      if (error) {
-        throw error;
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Gagal mengunggah model ke server.");
       }
 
-      setProgress(80);
+      setProgress(85);
 
-      // Ambil Public URL
-      const { data: publicData } = supabase.storage
-        .from("ar-models")
-        .getPublicUrl(data.path);
+      const uploadedUrl = result.publicUrl;
 
-      if (publicData?.publicUrl) {
-        // Update database hanya jika projectId tersedia
-        if (projectId) {
-          const { error: updateError } = await supabase
-            .from("ar_projects")
-            .update({ model_url: publicData.publicUrl })
-            .eq("id", projectId);
+      // Update database jika projectId tersedia
+      if (projectId) {
+        const { error: updateError } = await supabase
+          .from("ar_projects")
+          .update({ model_url: uploadedUrl })
+          .eq("id", projectId);
 
-          if (updateError) throw updateError;
+        if (updateError) {
+          console.warn("Update project model_url error:", updateError);
         }
-
-        onModelUploaded(publicData.publicUrl);
-        setProgress(100);
       }
+
+      onModelUploaded(uploadedUrl);
+      setProgress(100);
+      toast.success("File .glb berhasil disimpan ke Supabase Storage!");
     } catch (err: unknown) {
       console.error("Upload GLB error:", err);
-      setErrorMsg(
+      const msg =
         err instanceof Error
           ? err.message
-          : "Gagal mengunggah ke Supabase Storage. Menggunakan pratinjau lokal."
-      );
+          : "Gagal mengunggah ke Supabase Storage. Menggunakan pratinjau lokal.";
+      setErrorMsg(msg);
+      toast.error(msg);
     } finally {
       setUploading(false);
     }
