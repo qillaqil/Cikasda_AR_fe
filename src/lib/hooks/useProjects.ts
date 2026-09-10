@@ -63,25 +63,28 @@ export function invalidateProjectsCache() {
   return globalMutate(PROJECTS_CACHE_KEY);
 }
 
-// Fetcher for active MindAR compiled bundle (.mind)
+// Fetcher for active MindAR compiled bundle (.mind) with cache-busting timestamp
 async function fetchActiveBundle(): Promise<string> {
-  const defaultBundle = getPublicStorageUrl("ar-markers", "targets.mind");
+  const baseBundle = getPublicStorageUrl("ar-markers", "targets.mind");
   try {
     const { data: bundleData, error } = await supabase
       .from("mindar_bundles")
-      .select("bundle_url")
+      .select("bundle_url, created_at")
       .eq("is_active", true)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (!error && bundleData?.bundle_url) {
-      return bundleData.bundle_url;
+      const ts = bundleData.created_at
+        ? new Date(bundleData.created_at).getTime()
+        : Date.now();
+      return `${bundleData.bundle_url}?t=${ts}`;
     }
   } catch (err) {
     console.warn("Bundle fetch error, using fallback targets.mind:", err);
   }
-  return defaultBundle;
+  return `${baseBundle}?t=${Date.now()}`;
 }
 
 // Hook for fetching active MindAR bundle with SWR caching

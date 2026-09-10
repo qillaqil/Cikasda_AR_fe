@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       .from("ar-markers")
       .upload("targets.mind", buffer, {
         contentType: "application/octet-stream",
-        cacheControl: "3600",
+        cacheControl: "0",
         upsert: true,
       });
 
