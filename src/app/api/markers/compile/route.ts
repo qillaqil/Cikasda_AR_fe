@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 1. Upload sebagai file utama 'targets.mind' (selalu di-upsert untuk rujukan WebAR)
+    // 1. Upload file tunggal 'targets.mind' (selalu di-upsert agar rujukan WebAR konsisten)
     const { error: uploadPrimaryError } = await supabaseAdmin.storage
       .from("ar-markers")
       .upload("targets.mind", buffer, {
@@ -49,15 +49,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Upload salinan versi terarsip: targets-v{timestamp}.mind
-    const versionedFileName = `targets-v${Date.now()}.mind`;
-    await supabaseAdmin.storage
-      .from("ar-markers")
-      .upload(versionedFileName, buffer, {
-        contentType: "application/octet-stream",
-        cacheControl: "3600",
-        upsert: true,
-      });
+    // 2. Bersihkan file target versi lama (targets-v*.mind) jika ada, agar di bucket hanya ada SATU file 'targets.mind'
+    try {
+      const { data: files } = await supabaseAdmin.storage.from("ar-markers").list();
+      if (files && files.length > 0) {
+        const strayMindFiles = files
+          .filter((f) => f.name.startsWith("targets-v") && f.name.endsWith(".mind"))
+          .map((f) => f.name);
+
+        if (strayMindFiles.length > 0) {
+          await supabaseAdmin.storage.from("ar-markers").remove(strayMindFiles);
+        }
+      }
+    } catch (cleanErr) {
+      console.warn("Pembersihan file cadangan targets-v*.mind diabaikan:", cleanErr);
+    }
 
     // 3. Ambil URL Publik targets.mind
     const { data: publicData } = supabaseAdmin.storage
