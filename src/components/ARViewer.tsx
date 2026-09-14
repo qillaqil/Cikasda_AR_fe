@@ -341,6 +341,7 @@ function registerGestureComponents() {
 
         this.el.addEventListener("targetFound", () => {
           const targetIndex = getIndex(this.el);
+          console.log("[ARViewer] 🎯 Marker Terdeteksi! targetIndex:", targetIndex);
           if (targetIndex !== null) {
             window.dispatchEvent(
               new CustomEvent("marker-found", { detail: { targetIndex } }),
@@ -350,6 +351,7 @@ function registerGestureComponents() {
 
         this.el.addEventListener("targetLost", () => {
           const targetIndex = getIndex(this.el);
+          console.log("[ARViewer] 💨 Marker Hilang! targetIndex:", targetIndex);
           if (targetIndex !== null) {
             window.dispatchEvent(
               new CustomEvent("marker-lost", { detail: { targetIndex } }),

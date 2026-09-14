@@ -197,7 +197,13 @@ export default function MindARMarkersPage() {
       toast.loading("Mengekspor binary targets.mind...", { id: toastId });
 
       const exportedBuffer = await compiler.exportData();
-      const mindBlob = new Blob([exportedBuffer.buffer as ArrayBuffer], {
+      // Pastikan hanya byte aktual (byteOffset s/d byteLength) yang dimasukkan ke Blob
+      // Menggunakan exportedBuffer.slice() agar kapasitas sisa ArrayBuffer tidak ikut terunggah
+      const cleanUint8 =
+        exportedBuffer instanceof Uint8Array
+          ? exportedBuffer.slice()
+          : new Uint8Array(exportedBuffer);
+      const mindBlob = new Blob([cleanUint8], {
         type: "application/octet-stream",
       });
 
