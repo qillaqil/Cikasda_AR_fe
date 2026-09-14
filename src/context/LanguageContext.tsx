@@ -176,6 +176,8 @@ interface LanguageContextType {
   t: Record<TranslationKey, string>;
   models: ARModelData[];
   mindarTargetUrl: string;
+  isProjectsLoading: boolean;
+  isBundleLoading: boolean;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
@@ -184,8 +186,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("id");
-  const { activeProjects } = useProjects();
-  const { bundleUrl } = useMindARBundle();
+  const { activeProjects, isLoading: isProjectsLoading } = useProjects();
+  const { bundleUrl, isLoading: isBundleLoading } = useMindARBundle();
 
   const models = useMemo<ARModelData[]>(() => {
     return (activeProjects || []).map((item) => ({
@@ -213,6 +215,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         t: translations[language],
         models,
         mindarTargetUrl: bundleUrl,
+        isProjectsLoading,
+        isBundleLoading,
       }}
     >
       {children}

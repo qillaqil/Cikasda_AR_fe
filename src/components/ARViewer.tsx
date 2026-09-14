@@ -39,6 +39,7 @@ type AFrameComponentInstance = {
   scaleFactor?: number;
   handleOneFingerMove?: (event: Event) => void;
   handleTwoFingerMove?: (event: Event) => void;
+  handleReset?: () => void;
   handleTouchStart?: (event: TouchEvent) => void;
   handleTouchMove?: (event: TouchEvent) => void;
   handleTouchEnd?: () => void;
@@ -83,39 +84,35 @@ function loadScript(id: string, src: string) {
 
     if (existingScript?.dataset.loaded === "true") {
       resolve();
-      return;
-    }
-
-    if (existingScript) {
+    } else if (existingScript) {
       existingScript.addEventListener("load", () => resolve(), { once: true });
       existingScript.addEventListener(
         "error",
         () => reject(new Error(`Gagal memuat script ${src}`)),
         { once: true },
       );
-      return;
+    } else {
+      const script = document.createElement("script");
+      script.id = id;
+      script.src = src;
+      script.async = true;
+      script.crossOrigin = "anonymous";
+      script.addEventListener(
+        "load",
+        () => {
+          script.dataset.loaded = "true";
+          resolve();
+        },
+        { once: true },
+      );
+      script.addEventListener(
+        "error",
+        () => reject(new Error(`Gagal memuat script ${src}`)),
+        { once: true },
+      );
+
+      document.head.appendChild(script);
     }
-
-    const script = document.createElement("script");
-    script.id = id;
-    script.src = src;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.addEventListener(
-      "load",
-      () => {
-        script.dataset.loaded = "true";
-        resolve();
-      },
-      { once: true },
-    );
-    script.addEventListener(
-      "error",
-      () => reject(new Error(`Gagal memuat script ${src}`)),
-      { once: true },
-    );
-
-    document.head.appendChild(script);
   });
 }
 
@@ -275,6 +272,21 @@ function registerGestureComponents() {
           );
         };
 
+        const handleReset = () => {
+          if (this.targetElement) {
+            this.targetElement.object3D.rotation.set(0, 0, 0);
+            const defaultScale = this.initialScale ?? 0.1;
+            this.targetElement.object3D.scale.set(
+              defaultScale,
+              defaultScale,
+              defaultScale,
+            );
+            this.scaleFactor = 1;
+          }
+        };
+        this.handleReset = handleReset;
+        window.addEventListener("ar-reset-view", this.handleReset);
+
         this.el.sceneEl?.addEventListener(
           "onefingermove",
           this.handleOneFingerMove,
@@ -285,6 +297,9 @@ function registerGestureComponents() {
         );
       },
       remove() {
+        if (this.handleReset) {
+          window.removeEventListener("ar-reset-view", this.handleReset);
+        }
         if (this.handleOneFingerMove) {
           this.el.sceneEl?.removeEventListener(
             "onefingermove",
@@ -352,15 +367,25 @@ interface ARViewerProps {
 }
 
 export default function ARViewer({
-  activeTargetIndex,
+  activeTargetIndex: _activeTargetIndex,
   setActiveTargetIndex,
 }: ARViewerProps) {
-  const { models, t, mindarTargetUrl } = useLanguage();
+  const {
+    models,
+    t,
+    mindarTargetUrl,
+    isProjectsLoading,
+    isBundleLoading,
+  } = useLanguage();
   const activeTargetUrl = mindarTargetUrl || IMAGE_TARGET_URL;
   const sceneRef = useRef<AFrameElement | null>(null);
   const [scriptsReady, setScriptsReady] = useState(false);
   const [arReady, setArReady] = useState(false);
   const [arError, setArError] = useState<string | null>(null);
+
+  // Ready to mount the A-Frame AR scene when scripts are loaded and projects exist
+  const isReadyToRender =
+    scriptsReady && !isProjectsLoading && !isBundleLoading && models.length > 0;
 
   useEffect(() => {
     const handleMarkerFound = (e: Event) =>
@@ -416,19 +441,25 @@ export default function ARViewer({
     };
   }, []);
 
-  // Lifecycle handler untuk MindAR
+  // MindAR deterministic lifecycle management
   useEffect(() => {
-    if (!scriptsReady) return;
+    if (!isReadyToRender) return;
 
     const scene = sceneRef.current;
     if (!scene) return;
 
     let isSubscribed = true;
+    let watchdogTimer: NodeJS.Timeout | null = null;
+    let hasStarted = false;
 
     const handleArReady = () => {
       if (isSubscribed) {
         console.log("[ARViewer] MindAR siap dan aktif melacak marker.");
         setArReady(true);
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
       }
     };
 
@@ -437,20 +468,44 @@ export default function ARViewer({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const detail = (event as any).detail;
         console.error("[ARViewer] MindAR arError:", detail);
-        setArError(detail?.error || "Gagal memulai kamera WebAR.");
+        setArError(detail?.error || "Gagal membuka kamera perangkat.");
+        if (watchdogTimer) {
+          clearTimeout(watchdogTimer);
+          watchdogTimer = null;
+        }
       }
     };
 
     scene.addEventListener("arReady", handleArReady);
     scene.addEventListener("arError", handleArError);
 
-    const startARWhenLoaded = () => {
+    // Watchdog: If camera video stream is active, but dummyRun/arReady event
+    // is delayed (e.g. slow WebGL shader warmup / CPU throttled), dismiss loading overlay safely.
+    const startWatchdog = () => {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => {
+        if (isSubscribed) {
+          const videoEl = scene?.parentElement?.querySelector("video");
+          if (videoEl && !videoEl.paused && videoEl.readyState >= 2) {
+            console.warn(
+              "[ARViewer] Watchdog: Kamera aktif mengalirkan video, menutup layar loading.",
+            );
+            setArReady(true);
+          }
+        }
+      }, 5000);
+    };
+
+    const startAR = () => {
+      if (hasStarted || !isSubscribed) return;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const arSystem = (scene as any).systems?.["mindar-image-system"];
-      if (arSystem && !arSystem.video) {
-        console.log("[ARViewer] Memulai sistem MindAR...");
+      if (arSystem) {
+        hasStarted = true;
+        console.log("[ARViewer] Memulai sistem MindAR (start)...");
         try {
           const startPromise = arSystem.start();
+          startWatchdog();
           if (startPromise && typeof startPromise.then === "function") {
             startPromise.catch((err: unknown) => {
               console.error("[ARViewer] arSystem.start() error:", err);
@@ -461,15 +516,23 @@ export default function ARViewer({
           }
         } catch (err) {
           console.error("[ARViewer] Gagal memanggil arSystem.start():", err);
+          if (isSubscribed) {
+            setArError("Gagal membuka kamera perangkat.");
+          }
         }
+      } else {
+        // Retry on next frame if systems are still being registered
+        requestAnimationFrame(startAR);
       }
     };
 
+    // Trigger start exactly once when scene is ready
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((scene as any).hasLoaded) {
-      startARWhenLoaded();
+      startAR();
     } else {
-      scene.addEventListener("loaded", startARWhenLoaded, { once: true });
+      scene.addEventListener("loaded", startAR, { once: true });
+      scene.addEventListener("renderstart", startAR, { once: true });
     }
 
     const observer = new MutationObserver(() => {
@@ -489,12 +552,14 @@ export default function ARViewer({
 
     return () => {
       isSubscribed = false;
+      if (watchdogTimer) clearTimeout(watchdogTimer);
       observer.disconnect();
       scene.removeEventListener("arReady", handleArReady);
       scene.removeEventListener("arError", handleArError);
-      scene.removeEventListener("loaded", startARWhenLoaded);
+      scene.removeEventListener("loaded", startAR);
+      scene.removeEventListener("renderstart", startAR);
 
-      // Pastikan hardware kamera dan MindAR system dimatikan dengan bersih saat komponen unmount
+      // Clean up camera hardware and MindAR system cleanly on unmount
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const arSystem = (scene as any)?.systems?.["mindar-image-system"];
@@ -507,10 +572,13 @@ export default function ARViewer({
           stream.getTracks().forEach((track) => track.stop());
         }
       } catch (err) {
-        console.warn("[ARViewer] Gagal menghentikan stream kamera saat unmount:", err);
+        console.warn(
+          "[ARViewer] Gagal menghentikan stream kamera saat unmount:",
+          err,
+        );
       }
     };
-  }, [scriptsReady]);
+  }, [isReadyToRender, activeTargetUrl]);
 
   return (
     <section className="ar-viewport relative h-full min-h-[320px] w-full overflow-hidden rounded-[22px] bg-transparent text-white">
@@ -538,7 +606,7 @@ export default function ARViewer({
       `}</style>
 
       {/* Loading Overlay saat kamera & tracking sedang diinisialisasi */}
-      {!arReady && !arError && (
+      {isReadyToRender && !arReady && !arError && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 px-6 text-center text-white backdrop-blur-xs">
           <Loader2 className="mb-3 h-8 w-8 animate-spin text-teal-400" />
           <p className="text-sm font-semibold tracking-wide">
@@ -573,11 +641,31 @@ export default function ARViewer({
         </div>
       )}
 
-      {scriptsReady ? (
+      {!scriptsReady ? (
+        <div className="flex h-full w-full items-center justify-center text-white">
+          <Loader2 className="h-6 w-6 animate-spin text-teal-400 mr-2" />
+          <span className="text-xs">Memuat WebAR Engine...</span>
+        </div>
+      ) : isProjectsLoading || isBundleLoading ? (
+        <div className="flex h-full w-full items-center justify-center text-white">
+          <Loader2 className="h-6 w-6 animate-spin text-teal-400 mr-2" />
+          <span className="text-xs">Menyiapkan Data Marker & Proyek...</span>
+        </div>
+      ) : models.length === 0 ? (
+        <div className="flex h-full w-full flex-col items-center justify-center text-white p-4 text-center">
+          <p className="text-sm font-semibold text-slate-300">
+            Belum ada marker proyek yang aktif.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Silakan aktifkan proyek di Admin Dashboard.
+          </p>
+        </div>
+      ) : (
         <>
           <a-scene
+            key={activeTargetUrl}
             ref={sceneRef}
-            mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: true; uiScanning: no; uiLoading: no; uiError: no;`}
+            mindar-image={`imageTargetSrc: ${activeTargetUrl}; autoStart: false; uiScanning: no; uiLoading: no; uiError: no;`}
             color-space="sRGB"
             renderer="colorManagement: true; alpha: true; antialias: true"
             vr-mode-ui="enabled: false"
@@ -622,11 +710,6 @@ export default function ARViewer({
             </div>
           </div>
         </>
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-white">
-          <Loader2 className="h-6 w-6 animate-spin text-teal-400 mr-2" />
-          <span className="text-xs">Memuat A-Frame Runtime...</span>
-        </div>
       )}
     </section>
   );

@@ -78,13 +78,13 @@ async function fetchActiveBundle(): Promise<string> {
     if (!error && bundleData?.bundle_url) {
       const ts = bundleData.created_at
         ? new Date(bundleData.created_at).getTime()
-        : Date.now();
+        : 1;
       return `${bundleData.bundle_url}?t=${ts}`;
     }
   } catch (err) {
     console.warn("Bundle fetch error, using fallback targets.mind:", err);
   }
-  return `${baseBundle}?t=${Date.now()}`;
+  return baseBundle;
 }
 
 // Hook for fetching active MindAR bundle with SWR caching

@@ -74,7 +74,11 @@ function HomeContent() {
   };
 
   const currentModel =
-    activeTargetIndex !== null ? models[activeTargetIndex] : null;
+    activeTargetIndex !== null
+      ? models.find((m) => m.id === activeTargetIndex) ??
+        models[activeTargetIndex] ??
+        null
+      : null;
 
   return (
     <main className="h-[100svh] overflow-hidden bg-[#02090C] text-[#F4FFFF]">
