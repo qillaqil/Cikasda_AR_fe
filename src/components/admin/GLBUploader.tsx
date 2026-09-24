@@ -16,7 +16,8 @@ interface GLBUploaderProps {
   onModelUploaded: (url: string) => void;
 }
 
-const MAX_GLB_SIZE = 500 * 1024 * 1024; // 500 MB batas kompresi di browser
+const MAX_GLB_SIZE = 500 * 1024 * 1024; // 500 MB batas upload
+const BROWSER_COMPRESS_MAX = 64 * 1024 * 1024; // 64 MB: di atasnya OOM browser (bukti: 200 MB → OOM)
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -166,8 +167,16 @@ export default function GLBUploader({
     setFileInfo({ original: file.size });
     onModelUploaded(URL.createObjectURL(file));
 
-    // Kompresi selalu aktif: hasil kompresi yang diunggah, agar kuota Supabase hemat
-    compressAndUpload(file);
+    if (file.size <= BROWSER_COMPRESS_MAX) {
+      // Kecil: kompresi otomatis di browser (aman dari OOM)
+      compressAndUpload(file);
+    } else {
+      // Besar: kompresi browser OOM — upload raw langsung, sarankan optimasi offline
+      setErrorMsg(
+        `File ${formatBytes(file.size)} melebihi ${BROWSER_COMPRESS_MAX / 1024 / 1024} MB — kompresi browser berisiko gagal (Out of Memory). Akan diunggah MENTAH. Saran hemat kuota: optimasi dulu: npx @gltf-transform/cli optimize <file.glb> out.glb --compress draco --texture-resize 2048`
+      );
+      void uploadFile(file);
+    }
   };
 
   return (
