@@ -122,7 +122,7 @@ Respond ONLY with valid JSON in this exact schema:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Translate this Indonesian project into English:\n${userContent}` },
