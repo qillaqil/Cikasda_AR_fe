@@ -1,7 +1,7 @@
 "use client";
 
 import { Document, WebIO } from "@gltf-transform/core";
-import { dedup, draco, prune, quantize, weld } from "@gltf-transform/functions";
+import { dedup, draco, prune, quantize } from "@gltf-transform/functions";
 
 const MAX_TEXTURE_SIZE = 2048;
 const JPEG_QUALITY = 0.8;
@@ -85,7 +85,7 @@ async function resizeTexturesIfNeeded(doc: Document) {
 
 /**
  * Compress GLB ArrayBuffer via glTF-Transform.
- * Pipeline: dedup -> prune -> weld -> resize textures -> quantize -> draco
+ * Pipeline: dedup -> prune -> resize textures -> quantize -> draco
  * Returns compressed buffer. Falls back to draco-less if draco encoder unavailable.
  */
 export async function compressGlbBuffer(input: ArrayBuffer): Promise<ArrayBuffer> {
@@ -96,7 +96,9 @@ export async function compressGlbBuffer(input: ArrayBuffer): Promise<ArrayBuffer
   await resizeTexturesIfNeeded(doc);
 
   // Core mesh/material transforms
-  await doc.transform(dedup(), prune(), weld());
+  // ponytail: weld() dihapus — terlalu lambat untuk mesh besar di browser.
+  // Upgrade: jalankan weld via CLI @gltf-transform/offline bila kompresi butuh hasil lebih kecil.
+  await doc.transform(dedup(), prune());
 
   // Quantize reduces precision before draco
   await doc.transform(quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12 }));

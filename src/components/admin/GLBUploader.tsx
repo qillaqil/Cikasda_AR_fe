@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CheckCircle2, FileUp, Loader2, UploadCloud, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -33,6 +33,7 @@ export default function GLBUploader({
   const [errorMsg, setErrorMsg] = useState("");
   const [rawMode, setRawMode] = useState(false);
   const supabase = createClient();
+  const workerRef = useRef<Worker | null>(null);
 
   const persistModelUrl = async (uploadedUrl: string) => {
     if (projectId) {
@@ -93,12 +94,14 @@ export default function GLBUploader({
 
     // Dynamic worker: hanya admin route yang butuh gltf-transform
     const worker = new Worker(
-      new URL("@/lib/workers/gltfCompress.worker", import.meta.url),
+      new URL("../../lib/workers/gltfCompress.worker", import.meta.url),
       { type: "module" }
     );
+    workerRef.current = worker;
 
     setCompressing(true);
     worker.onmessage = (e: MessageEvent<CompressResult | CompressError>) => {
+      workerRef.current = null;
       worker.terminate();
       setCompressing(false);
       if (e.data.type === "error") {
@@ -123,6 +126,14 @@ export default function GLBUploader({
     };
 
     worker.postMessage({ type: "compress", file: original } satisfies CompressRequest);
+  };
+
+  const cancelCompression = () => {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+    setCompressing(false);
+    setErrorMsg("Kompresi dibatalkan.");
+    toast.info("Kompresi dibatalkan. File belum diunggah.");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -214,6 +225,15 @@ export default function GLBUploader({
             <span className="mt-1 block text-[10px] text-slate-500">
               {compressing ? "Mengompres (bisa beberapa menit untuk file besar)..." : `${progress}%`}
             </span>
+            {compressing && (
+              <button
+                type="button"
+                onClick={cancelCompression}
+                className="mt-2 inline-flex items-center gap-1 rounded-md border border-rose-200 px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50"
+              >
+                <X className="h-3 w-3" /> Batalkan
+              </button>
+            )}
           </div>
         )}
       </div>
