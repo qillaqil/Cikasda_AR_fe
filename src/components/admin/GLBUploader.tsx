@@ -4,7 +4,11 @@ import { useRef, useState } from "react";
 import { CheckCircle2, FileUp, Loader2, UploadCloud, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
-import type { CompressRequest, CompressResult, CompressError } from "@/lib/workers/gltfCompress.worker";
+import type {
+  CompressRequest,
+  CompressResult,
+  CompressError,
+} from "@/lib/workers/gltfCompress.worker";
 
 interface GLBUploaderProps {
   projectId?: string | null;
@@ -12,8 +16,7 @@ interface GLBUploaderProps {
   onModelUploaded: (url: string) => void;
 }
 
-const MAX_RAW_SIZE = 100 * 1024 * 1024; // 100 MB untuk upload mentah
-const MAX_COMPRESSABLE_SIZE = 400 * 1024 * 1024; // 400 MB untuk upload + kompresi
+const MAX_GLB_SIZE = 500 * 1024 * 1024; // 500 MB batas kompresi di browser
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -31,7 +34,6 @@ export default function GLBUploader({
   const [fileName, setFileName] = useState("");
   const [fileInfo, setFileInfo] = useState<{ original: number; compressed?: number; ratio?: number } | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
-  const [rawMode, setRawMode] = useState(false);
   const supabase = createClient();
   const workerRef = useRef<Worker | null>(null);
 
@@ -51,24 +53,30 @@ export default function GLBUploader({
   const uploadFile = async (file: File) => {
     try {
       setUploading(true);
-      setProgress(30);
+      setProgress(5);
 
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("bucket", "ar-models");
+      // Upload langsung dari browser ke Supabase Storage (TUS resumable untuk >6 MB,
+      // tanpa melewati limit payload Vercel). RLS: admin authenticated boleh INSERT.
+      const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      const { error: uploadError } = await supabase.storage
+        .from("ar-models")
+        .upload(safeName, file, {
+          contentType: "model/gltf-binary",
+          cacheControl: "3600",
+          upsert: false,
+        });
 
-      const result = await res.json();
-      if (!res.ok || !result.success) {
-        throw new Error(result.error || "Gagal mengunggah model ke server.");
+      if (uploadError) {
+        throw new Error(`Gagal mengunggah ke Supabase Storage: ${uploadError.message}`);
       }
 
       setProgress(85);
-      const uploadedUrl = result.publicUrl;
+      const { data: publicData } = supabase.storage
+        .from("ar-models")
+        .getPublicUrl(safeName);
+
+      const uploadedUrl = publicData.publicUrl;
       await persistModelUrl(uploadedUrl);
       setProgress(100);
       toast.success(
@@ -146,33 +154,19 @@ export default function GLBUploader({
       return;
     }
 
-    if (rawMode) {
-      if (file.size > MAX_RAW_SIZE) {
-        setErrorMsg(`Ukuran upload mentah maksimal ${MAX_RAW_SIZE / 1024 / 1024} MB. Nonaktifkan mode mentah atau gunakan kompresi.`);
-        return;
-      }
-      setErrorMsg("");
-      setFileName(file.name);
-      setFileInfo({ original: file.size });
-      onModelUploaded(URL.createObjectURL(file));
-      await uploadFile(file);
-      return;
-    }
-
-    if (file.size > MAX_COMPRESSABLE_SIZE) {
+    if (file.size > MAX_GLB_SIZE) {
       setErrorMsg(
-        `File terlalu besar (${formatBytes(file.size)}). Kompresi di browser dibatasi ${MAX_COMPRESSABLE_SIZE / 1024 / 1024} MB. Kompresikan offline dulu: npx @gltf-transform/cli optimize <file.glb> out.glb --compress draco --textureCompress ktx2`
+        `File terlalu besar (${formatBytes(file.size)}). Maksimal ${MAX_GLB_SIZE / 1024 / 1024} MB per model untuk kompresi di browser. Kurangi dulu geometrinya, atau kompresikan offline: npx @gltf-transform/cli optimize <file.glb> out.glb --compress draco`
       );
       return;
     }
 
-    if (file.size > MAX_RAW_SIZE) {
-      // Besar → wajib kompresi
-      compressAndUpload(file);
-      return;
-    }
+    setErrorMsg("");
+    setFileName(file.name);
+    setFileInfo({ original: file.size });
+    onModelUploaded(URL.createObjectURL(file));
 
-    // Kecil → tawarkan kompresi cepat, tetap lanjut kompresi (murah)
+    // Kompresi selalu aktif: hasil kompresi yang diunggah, agar kuota Supabase hemat
     compressAndUpload(file);
   };
 
@@ -208,9 +202,7 @@ export default function GLBUploader({
                 : "Pilih File .glb atau Tarik ke Sini"}
           </p>
           <p className="mt-0.5 text-[11px] text-slate-400">
-            {rawMode
-              ? `Mode mentah: maksimal ${MAX_RAW_SIZE / 1024 / 1024} MB`
-              : `Otomatis terkompresi (Draco + resize texture) · maks mentah ${MAX_COMPRESSABLE_SIZE / 1024 / 1024} MB`}
+            Otomatis terkompresi (Draco + resize texture) · maks {MAX_GLB_SIZE / 1024 / 1024} MB
           </p>
         </div>
 
@@ -237,17 +229,6 @@ export default function GLBUploader({
           </div>
         )}
       </div>
-
-      {/* Mode toggle */}
-      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-600 hover:bg-slate-50">
-        <input
-          type="checkbox"
-          checked={rawMode}
-          onChange={(ev) => setRawMode(ev.target.checked)}
-          className="accent-teal-600"
-        />
-        Upload tanpa kompresi (mentah, maks {MAX_RAW_SIZE / 1024 / 1024} MB — hemat untuk file kecil / fidelity penuh)
-      </label>
 
       {/* Selected File Badge */}
       {fileName && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { Document, WebIO } from "@gltf-transform/core";
-import { dedup, draco, prune, quantize } from "@gltf-transform/functions";
+import { draco, prune, quantize } from "@gltf-transform/functions";
 
 const MAX_TEXTURE_SIZE = 2048;
 const JPEG_QUALITY = 0.8;
@@ -85,23 +85,32 @@ async function resizeTexturesIfNeeded(doc: Document) {
 
 /**
  * Compress GLB ArrayBuffer via glTF-Transform.
- * Pipeline: dedup -> prune -> resize textures -> quantize -> draco
- * Returns compressed buffer. Falls back to draco-less if draco encoder unavailable.
+ * Pipeline: prune -> resize textures -> quantize -> draco.
+ * Returns compressed buffer. `progress` (0-100) dipanggil tiap tahap selesai.
  */
-export async function compressGlbBuffer(input: ArrayBuffer): Promise<ArrayBuffer> {
+export async function compressGlbBuffer(
+  input: ArrayBuffer,
+  progress?: (pct: number) => void
+): Promise<ArrayBuffer> {
+  const report = (p: number) => progress?.(Math.round(p));
+
   const io = new WebIO();
   const doc = await io.readBinary(new Uint8Array(input));
+  report(20);
 
   // Texture resize before quantize/draco (operates on images)
   await resizeTexturesIfNeeded(doc);
+  report(40);
 
-  // Core mesh/material transforms
-  // ponytail: weld() dihapus — terlalu lambat untuk mesh besar di browser.
-  // Upgrade: jalankan weld via CLI @gltf-transform/offline bila kompresi butuh hasil lebih kecil.
-  await doc.transform(dedup(), prune());
+  // Prune unused nodes/materials only.
+  // ponytail: dedup()/weld() dihapus — O(n) sangat mahal di browser, tidak sepadan.
+  // Upgrade: kompres offline via @gltf-transform CLI bila rasio kurang memuaskan.
+  await doc.transform(prune());
+  report(55);
 
   // Quantize reduces precision before draco
   await doc.transform(quantize({ quantizePosition: 14, quantizeNormal: 10, quantizeTexcoord: 12 }));
+  report(70);
 
   // Draco last; if it fails (encoder missing), keep quantize result
   try {
@@ -109,10 +118,14 @@ export async function compressGlbBuffer(input: ArrayBuffer): Promise<ArrayBuffer
   } catch (e) {
     console.warn("[compressGlb] draco skipped:", e);
   }
+  report(85);
 
   const out = await io.writeBinary(doc);
+  report(95);
   // out is Uint8Array; return detached ArrayBuffer slice
-  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+  const buf = out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+  report(100);
+  return buf;
 }
 
 export function toCompressedFile(original: File, compressedBuf: ArrayBuffer): File {
